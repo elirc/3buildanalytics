@@ -1,0 +1,20 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+.vite/
+.DS_Store
+*.log
+.env
+.env.local
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
+backend/generated/
+backend/storage/exports/*.csv
+backend/dist/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
+
+# Local-only infrastructure overrides (ports differ per machine)
+docker-compose.override.yml
