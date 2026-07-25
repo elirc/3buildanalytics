@@ -15,6 +15,11 @@ export const exportsController = {
     response.status(201).json(result);
   },
 
+  async estimate(request: Request, response: Response) {
+    const result = await exportsService.estimate(request.body.exportType, request.body.filters);
+    response.status(200).json(result);
+  },
+
   async list(request: Request, response: Response) {
     const result = await exportsService.listForUser(request.user!.id);
     response.status(200).json(result);

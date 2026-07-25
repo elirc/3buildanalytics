@@ -11,6 +11,7 @@ backend/prisma/dev.db
 backend/prisma/dev.db-journal
 backend/generated/
 backend/storage/exports/*.csv
+backend/storage/exports-test/
 backend/dist/
 frontend/dist/
 frontend/playwright-report/

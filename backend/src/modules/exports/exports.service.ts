@@ -10,6 +10,7 @@ import { prisma } from "../../db/prisma.js";
 import { AppError } from "../../shared/errors/AppError.js";
 import { ERROR_CODES } from "../../shared/errors/errorCodes.js";
 import { logWarn } from "../../shared/utils/logger.js";
+import { parseDateRange } from "../../shared/utils/dates.js";
 import { dashboardService } from "../dashboard/dashboard.service.js";
 import { auditService } from "../audit/audit.service.js";
 import { exportsRepository } from "./exports.repository.js";
@@ -24,6 +25,12 @@ export const exportsService = {
     exportType: ExportType;
     filters?: Record<string, unknown>;
   }) {
+    // Estimate BEFORE inserting the row. buildDateFilter now throws on an
+    // invalid window, and doing this second would leave an orphaned PENDING job
+    // behind every rejected request — rows that nothing will ever process and
+    // that inflate the queue-depth metric.
+    const estimatedRowCount = await estimateExportRows(input.exportType, input.filters);
+
     const job = await exportsRepository.create({
       requestedById: input.requestedById,
       exportType: input.exportType,
@@ -41,8 +48,6 @@ export const exportsService = {
         filters: input.filters
       }
     });
-
-    const estimatedRowCount = await estimateExportRows(input.exportType, input.filters);
 
     if (estimatedRowCount <= MAX_SYNC_EXPORT_ROWS) {
       return this.processJob(job.id, {
@@ -69,6 +74,12 @@ export const exportsService = {
     }
 
     return job;
+  },
+
+  /** Row count a set of filters would produce, without creating a job. */
+  async estimate(exportType: ExportType, filters?: Record<string, unknown>) {
+    const rowCount = await estimateExportRows(exportType, filters);
+    return { rowCount, willQueue: rowCount > MAX_SYNC_EXPORT_ROWS, maxSyncRows: MAX_SYNC_EXPORT_ROWS };
   },
 
   async listForUser(userId: string) {
@@ -212,22 +223,31 @@ export const exportsService = {
   }
 };
 
-async function estimateExportRows(
+/**
+ * Counts what an export would produce.
+ *
+ * Only the relevant where-clause is built now. The previous version built all
+ * three regardless of type, which was harmless when they returned `{}` and is
+ * actively wrong now that a missing date throws — an audit export would have
+ * blown up validating a tracked-event clause it never used.
+ */
+export async function estimateExportRows(
   exportType: ExportType,
   filters?: Record<string, unknown>
 ) {
-  const whereDateRange = buildDateFilter(filters, "occurredAt");
-  const whereAuditDateRange = buildDateFilter(filters, "createdAt");
-  const whereMetricDateRange = buildDateFilter(filters, "recordedAt");
+  const safeFilters = filters ?? {};
 
   switch (exportType) {
     case "TRACKED_EVENTS":
-      return prisma.trackedEvent.count({ where: whereDateRange });
+      return prisma.trackedEvent.count({ where: buildTrackedEventWhere(safeFilters) });
     case "AUDIT_EVENTS":
-      return prisma.auditEvent.count({ where: whereAuditDateRange });
+      return prisma.auditEvent.count({ where: buildAuditEventWhere(safeFilters) });
     case "MONITORING_METRICS":
-      return prisma.monitoringMetric.count({ where: whereMetricDateRange });
+      return prisma.monitoringMetric.count({ where: buildMonitoringMetricWhere(safeFilters) });
     case "KPI_SUMMARY":
+      // One row by definition — but still validate the window so a bad range is
+      // refused here rather than surfacing later inside the job.
+      buildDateFilter(safeFilters, "occurredAt");
       return 1;
     default:
       return 0;
@@ -244,7 +264,9 @@ async function buildExportRows(
   switch (exportType) {
     case "TRACKED_EVENTS": {
       const items = await prisma.trackedEvent.findMany({
-        where: buildDateFilter(filters, "occurredAt"),
+        // Now applies eventType/actorId/entityType/search, which the schema
+        // accepted and this function previously ignored.
+        where: buildTrackedEventWhere(filters),
         orderBy: { occurredAt: "desc" },
         take: 25_000
       });
@@ -261,7 +283,7 @@ async function buildExportRows(
 
     case "AUDIT_EVENTS": {
       const items = await prisma.auditEvent.findMany({
-        where: buildDateFilter(filters, "createdAt"),
+        where: buildAuditEventWhere(filters),
         include: {
           actor: {
             select: {
@@ -285,7 +307,7 @@ async function buildExportRows(
 
     case "MONITORING_METRICS": {
       const items = await prisma.monitoringMetric.findMany({
-        where: buildDateFilter(filters, "recordedAt"),
+        where: buildMonitoringMetricWhere(filters),
         orderBy: { recordedAt: "desc" },
         take: 25_000
       });
@@ -323,24 +345,73 @@ async function buildExportRows(
   }
 }
 
+/**
+ * Builds the date clause for an export.
+ *
+ * Previously this returned `{}` when either date was missing or unparseable,
+ * which meant an unfiltered query: a typo in a filter key silently exported the
+ * entire table (capped at 25,000 rows) rather than the week that was asked for.
+ * Exports are the one place where quietly returning *more* data than requested
+ * is the worst possible failure mode, so it now throws.
+ *
+ * parseDateRange also gives us the inclusive end-of-day handling from US-02,
+ * so an export ending "today" contains today.
+ */
 function buildDateFilter(
   filters: Record<string, unknown> | undefined,
   field: "occurredAt" | "createdAt" | "recordedAt"
 ) {
   const safeFilters = filters ?? {};
-  const startDate =
-    typeof safeFilters.startDate === "string" ? new Date(safeFilters.startDate) : null;
-  const endDate = typeof safeFilters.endDate === "string" ? new Date(safeFilters.endDate) : null;
+  const { startDate, endDate } = safeFilters;
 
-  if (!startDate || !endDate || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return {};
+  if (typeof startDate !== "string" || typeof endDate !== "string") {
+    throw new AppError(
+      ERROR_CODES.BAD_REQUEST,
+      "Exports require both startDate and endDate",
+      400
+    );
   }
+
+  const range = parseDateRange(startDate, endDate, { maxRangeDays: 365 });
 
   return {
     [field]: {
-      gte: startDate,
-      lte: endDate
+      gte: range.startDate,
+      lte: range.endDate
     }
+  };
+}
+
+/** Non-date filters, applied per export type. */
+function buildTrackedEventWhere(filters: Record<string, unknown>) {
+  return {
+    ...buildDateFilter(filters, "occurredAt"),
+    eventType: typeof filters.eventType === "string" ? (filters.eventType as never) : undefined,
+    actorId: typeof filters.actorId === "string" ? filters.actorId : undefined,
+    entityType: typeof filters.entityType === "string" ? filters.entityType : undefined,
+    OR:
+      typeof filters.search === "string" && filters.search !== ""
+        ? [
+            { actorEmail: { contains: filters.search, mode: "insensitive" as const } },
+            { entityType: { contains: filters.search, mode: "insensitive" as const } }
+          ]
+        : undefined
+  };
+}
+
+function buildAuditEventWhere(filters: Record<string, unknown>) {
+  return {
+    ...buildDateFilter(filters, "createdAt"),
+    action: typeof filters.action === "string" ? filters.action : undefined,
+    actorId: typeof filters.actorId === "string" ? filters.actorId : undefined,
+    entityType: typeof filters.entityType === "string" ? filters.entityType : undefined
+  };
+}
+
+function buildMonitoringMetricWhere(filters: Record<string, unknown>) {
+  return {
+    ...buildDateFilter(filters, "recordedAt"),
+    metricType: typeof filters.metricType === "string" ? (filters.metricType as never) : undefined
   };
 }
 
