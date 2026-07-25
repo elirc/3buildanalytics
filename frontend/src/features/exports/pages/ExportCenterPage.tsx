@@ -6,7 +6,7 @@ import { DataTable } from "../../../components/DataTable";
 import { LoadingState } from "../../../components/LoadingState";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
-import { formatDate, getDefaultDateRange } from "../../../lib/formatDate";
+import { formatDateTime, getDefaultDateRange } from "../../../lib/formatDate";
 
 export function ExportCenterPage() {
   const defaultRange = getDefaultDateRange();
@@ -66,7 +66,9 @@ export function ExportCenterPage() {
             {
               key: "createdAt",
               header: "Created",
-              render: (value) => formatDate(String(value))
+              // Several exports a day is normal; without the time the column
+              // cannot tell you which run you are looking at.
+              render: (value) => formatDateTime(String(value))
             },
             { key: "rowCount", header: "Rows" },
             {
