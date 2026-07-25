@@ -1,8 +1,9 @@
-import { EventType, type Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 import { AppError } from "../../shared/errors/AppError.js";
 import { ERROR_CODES } from "../../shared/errors/errorCodes.js";
-import { parseDateRange, toIsoDate } from "../../shared/utils/dates.js";
+import { parseDateRange } from "../../shared/utils/dates.js";
+import { dashboardRepository } from "../dashboard/dashboard.repository.js";
 import { cacheInvalidator } from "../../cache/cacheInvalidator.js";
 import { eventsRepository } from "./events.repository.js";
 
@@ -45,35 +46,26 @@ export const eventsService = {
     return event;
   },
 
+  /**
+   * Was 22 queries to produce 11 integers: a loop over every EventType, each
+   * iteration calling findMany — which itself runs a findMany *and* a count —
+   * and discarding the 25 fetched rows.
+   *
+   * Now one GROUP BY. includeZeroes preserves this endpoint's contract of
+   * returning every type, so a chart shows the full vocabulary rather than only
+   * what happened to occur.
+   */
   async getSummaryByType(filters: { startDate: string; endDate: string }) {
     const { startDate, endDate } = parseDateRange(filters.startDate, filters.endDate);
-
-    const counts = await Promise.all(
-      Object.values(EventType).map(async (eventType) => ({
-        eventType,
-        count: await eventsRepository.findMany({
-          startDate,
-          endDate,
-          eventType
-        }).then((result) => result.total)
-      }))
-    );
-
-    return counts;
+    return dashboardRepository.getEventsByType(startDate, endDate, { includeZeroes: true });
   },
 
+  /**
+   * Was: fetch up to 10,000 rows into Node and group them with reduce. Now the
+   * database buckets them and returns one row per day.
+   */
   async getSummaryOverTime(filters: { startDate: string; endDate: string }) {
     const { startDate, endDate } = parseDateRange(filters.startDate, filters.endDate);
-    const data = await eventsRepository.findMany({ startDate, endDate, pageSize: 10_000 });
-
-    const grouped = data.items.reduce<Record<string, number>>((accumulator, event) => {
-      const key = toIsoDate(event.occurredAt);
-      accumulator[key] = (accumulator[key] ?? 0) + 1;
-      return accumulator;
-    }, {});
-
-    return Object.entries(grouped)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([date, count]) => ({ date, count }));
+    return dashboardRepository.getEventsOverTime(startDate, endDate, "day");
   }
 };

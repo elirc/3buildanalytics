@@ -19,20 +19,38 @@ export const dashboardRepository = {
     return Number(result[0]?.count ?? 0n);
   },
 
-  async getEventsByType(startDate: Date, endDate: Date) {
-    const data = await Promise.all(
-      Object.values(EventType).map(async (eventType) => ({
-        eventType,
-        count: await prisma.trackedEvent.count({
-          where: {
-            eventType,
-            occurredAt: { gte: startDate, lte: endDate }
-          }
-        })
-      }))
-    );
+  /**
+   * Counts per event type in one query.
+   *
+   * Was eleven separate COUNT queries — one per enum value — fired in parallel
+   * and awaited together. One GROUP BY does the same work in a single round
+   * trip and lets the index on eventType do its job.
+   *
+   * @param includeZeroes when true, types with no events are returned as 0.
+   *        The two callers genuinely disagreed about this: the dashboard chart
+   *        wanted only what occurred, the events summary wanted the full
+   *        vocabulary. Rather than silently pick one, the difference is now a
+   *        parameter and both existing contracts are preserved.
+   */
+  async getEventsByType(startDate: Date, endDate: Date, options?: { includeZeroes?: boolean }) {
+    const rows = await prisma.trackedEvent.groupBy({
+      by: ["eventType"],
+      where: { occurredAt: { gte: startDate, lte: endDate } },
+      _count: { _all: true }
+    });
 
-    return data.filter((item) => item.count > 0);
+    const counts = new Map(rows.map((row) => [row.eventType, row._count._all]));
+
+    if (options?.includeZeroes) {
+      return Object.values(EventType).map((eventType) => ({
+        eventType,
+        count: counts.get(eventType) ?? 0
+      }));
+    }
+
+    return Object.values(EventType)
+      .map((eventType) => ({ eventType, count: counts.get(eventType) ?? 0 }))
+      .filter((item) => item.count > 0);
   },
 
   async getEventsOverTime(startDate: Date, endDate: Date, interval: "day" | "week" = "day") {
