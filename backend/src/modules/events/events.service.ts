@@ -3,11 +3,19 @@ import { EventType, type Prisma } from "@prisma/client";
 import { AppError } from "../../shared/errors/AppError.js";
 import { ERROR_CODES } from "../../shared/errors/errorCodes.js";
 import { parseDateRange, toIsoDate } from "../../shared/utils/dates.js";
+import { cacheInvalidator } from "../../cache/cacheInvalidator.js";
 import { eventsRepository } from "./events.repository.js";
 
 export const eventsService = {
   async track(data: Prisma.TrackedEventCreateInput) {
-    return eventsRepository.create(data);
+    const event = await eventsRepository.create(data);
+
+    // After the write, and never allowed to fail it: the TTL is still a
+    // backstop, so a cache that cannot be cleared is a staleness problem, not a
+    // reason to reject the caller's event.
+    await cacheInvalidator.onTrackedEvent();
+
+    return event;
   },
 
   async list(filters: {

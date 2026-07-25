@@ -4,11 +4,14 @@ import { cacheKeys } from "../../cache/cacheKeys.js";
 import { getQueueCounts } from "../../jobs/queue.js";
 import { cacheService } from "../../cache/cache.service.js";
 import { parseDateRange, toIsoDate } from "../../shared/utils/dates.js";
+import { cacheInvalidator } from "../../cache/cacheInvalidator.js";
 import { monitoringRepository } from "./monitoring.repository.js";
 
 export const monitoringService = {
   async record(data: Prisma.MonitoringMetricCreateInput) {
-    return monitoringRepository.create(data);
+    const metric = await monitoringRepository.create(data);
+    await cacheInvalidator.onMonitoringMetric();
+    return metric;
   },
 
   async getSummary(input: {
