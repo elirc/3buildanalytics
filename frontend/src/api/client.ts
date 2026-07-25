@@ -6,9 +6,8 @@ export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
  * The error every API call rejects with.
  *
  * Carries the backend's machine-readable `code` and the HTTP status alongside
- * the message. Previously only the message survived, so the UI could not tell
- * "you are not allowed to see this" from "the server fell over" and showed the
- * same raw string for both.
+ * the message, so the UI can tell "you are not allowed to see this" from "the
+ * server fell over" instead of showing the same raw string for both.
  */
 export class ApiError extends Error {
   readonly code: string;
@@ -23,13 +22,62 @@ export class ApiError extends Error {
     this.requestId = input.requestId;
   }
 
-  /** True when retrying without changing anything could plausibly work. */
   get isRetryable() {
     return this.status >= 500 || this.status === 0;
   }
 }
 
-export async function apiFetch(path: string, init?: RequestInit) {
+/**
+ * In-flight refresh, shared by every caller.
+ *
+ * A dashboard fires half a dozen queries at once. When the access token
+ * expires they all get 401 at the same moment, and without this each would
+ * start its own refresh. Since refresh *rotates* the token, the first to land
+ * invalidates the rest — so concurrent refreshes would revoke each other and,
+ * now that reuse detection exists, look exactly like a replay attack and log
+ * everyone out.
+ *
+ * So: the first 401 starts the refresh, everyone else awaits the same promise.
+ */
+let refreshPromise: Promise<boolean> | null = null;
+
+async function refreshSession(): Promise<boolean> {
+  const { refreshToken, setSession, clearSession } = useAuthStore.getState();
+
+  if (!refreshToken) {
+    clearSession();
+    return false;
+  }
+
+  const response = await fetch(`${API_URL}/api/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken })
+  });
+
+  if (!response.ok) {
+    clearSession();
+    return false;
+  }
+
+  const session = (await response.json()) as Parameters<typeof setSession>[0];
+  setSession(session);
+  return true;
+}
+
+function refreshOnce() {
+  if (!refreshPromise) {
+    refreshPromise = refreshSession().finally(() => {
+      // Cleared regardless of outcome so a later 401 can try again rather than
+      // reusing a settled promise forever.
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise;
+}
+
+async function performFetch(path: string, init?: RequestInit) {
   const token = useAuthStore.getState().accessToken;
   const headers = new Headers(init?.headers);
 
@@ -41,10 +89,29 @@ export async function apiFetch(path: string, init?: RequestInit) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers
-  });
+  return fetch(`${API_URL}${path}`, { ...init, headers });
+}
+
+export async function apiFetch(path: string, init?: RequestInit) {
+  let response = await performFetch(path, init);
+
+  // One refresh-and-replay attempt, never more. Retrying a second time would
+  // loop forever against an endpoint that returns 401 for reasons unrelated to
+  // token expiry.
+  //
+  // The refresh endpoint itself is excluded: if refreshing gives a 401 the
+  // session is genuinely finished, and re-entering would recurse.
+  if (response.status === 401 && !path.startsWith("/api/auth/refresh")) {
+    const refreshed = await refreshOnce();
+
+    if (refreshed) {
+      response = await performFetch(path, init);
+    }
+    // On failure refreshSession() has already cleared the store. RequireAuth
+    // watches that state, so the redirect to /login happens on the next render
+    // — no imperative navigation needed here, and the API layer stays free of
+    // router knowledge. LoginPage sends the user back where they were.
+  }
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as
@@ -53,8 +120,6 @@ export async function apiFetch(path: string, init?: RequestInit) {
 
     throw new ApiError({
       message: payload?.error?.message ?? "Request failed",
-      // Fall back to a status-derived code so a non-JSON failure (a proxy error
-      // page, say) still produces something the UI can branch on.
       code: payload?.error?.code ?? codeFromStatus(response.status),
       status: response.status,
       requestId: payload?.error?.requestId
@@ -80,4 +145,9 @@ export async function apiClient<T>(path: string, init?: RequestInit): Promise<T>
   }
 
   return response.json() as Promise<T>;
+}
+
+/** Test-only: drop any in-flight refresh so suites cannot leak state. */
+export function __resetRefreshStateForTests() {
+  refreshPromise = null;
 }

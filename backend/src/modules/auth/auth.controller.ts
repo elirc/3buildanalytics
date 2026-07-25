@@ -44,5 +44,10 @@ export const authController = {
   async logout(request: Request, response: Response) {
     await authService.logout(request.body.refreshToken);
     response.status(204).send();
+  },
+
+  async logoutAll(request: Request, response: Response) {
+    const revoked = await authService.revokeAllForUser(request.user!.id);
+    response.status(200).json({ revoked });
   }
 };

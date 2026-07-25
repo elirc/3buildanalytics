@@ -39,6 +39,7 @@ const ROUTES: RouteSpec[] = [
   { method: "post", path: "/api/auth/login", permission: null },
   { method: "post", path: "/api/auth/refresh", permission: null },
   { method: "post", path: "/api/auth/logout", permission: null },
+  { method: "post", path: "/api/auth/logout-all", permission: "AUTHENTICATED" },
   { method: "get", path: "/api/auth/me", permission: "AUTHENTICATED" },
   // Any signed-in user may read their own permission list — it tells them
   // nothing they could not learn by clicking around, and the UI needs it.
