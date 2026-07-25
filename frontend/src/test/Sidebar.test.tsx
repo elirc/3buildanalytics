@@ -21,7 +21,8 @@ const EXPECTED: Record<Role, string[]> = {
     "Events",
     "Audit",
     "Monitoring",
-    "Configs"
+    "Configs",
+    "Users"
   ],
   OPS_MANAGER: ["Operations", "Product", "Executive", "Exports", "Events", "Configs"],
   PRODUCT_MANAGER: ["Operations", "Product", "Executive", "Exports", "Events", "Configs"],

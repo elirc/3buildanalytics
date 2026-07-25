@@ -9,6 +9,7 @@ import { parseDurationToMs } from "../../shared/utils/duration.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../../shared/utils/jwt.js";
 import { getPermissionsForRole } from "../../shared/permissions.js";
 import { auditService } from "../audit/audit.service.js";
+import { usersService } from "../users/users.service.js";
 
 interface RegisterInput {
   email: string;
@@ -24,51 +25,29 @@ interface LoginInput {
 }
 
 export const authService = {
+  /**
+   * Public self-registration.
+   *
+   * The role is forced to READ_ONLY and the caller's requested role is ignored.
+   * This endpoint is unauthenticated, and it previously honoured whatever role
+   * the body asked for — so anyone who could reach the API could mint
+   * themselves a SYSTEM_ADMIN. Privileged accounts are created through
+   * POST /api/users, which requires users:manage.
+   *
+   * Creation itself is delegated to usersService so hashing, email
+   * normalisation and audit logging cannot drift between the two paths.
+   */
   async register(input: RegisterInput) {
-    const existingUser = await prisma.user.findUnique({
-      where: { email: input.email.toLowerCase() }
+    const user = await usersService.create({
+      email: input.email,
+      password: input.password,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      role: "READ_ONLY"
     });
 
-    if (existingUser) {
-      throw new AppError(ERROR_CODES.CONFLICT, "User already exists", 409);
-    }
-
-    const passwordHash = await hashPassword(input.password);
-
-    const user = await prisma.user.create({
-      data: {
-        email: input.email.toLowerCase(),
-        passwordHash,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        role: input.role
-      }
-    });
-
-    await prisma.trackedEvent.create({
-      data: {
-        eventType: "USER_SIGNED_UP",
-        actorId: user.id,
-        actorEmail: user.email,
-        entityType: "User",
-        entityId: user.id,
-        metadata: {
-          role: user.role
-        }
-      }
-    });
-
-    await auditService.record({
-      actorId: user.id,
-      action: "USER_CREATED",
-      entityType: "User",
-      entityId: user.id,
-      metadata: {
-        role: user.role
-      }
-    });
-
-    return createSession(user);
+    const fullUser = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    return createSession(fullUser);
   },
 
   async login(input: LoginInput) {

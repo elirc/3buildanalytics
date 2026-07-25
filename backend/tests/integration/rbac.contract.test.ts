@@ -47,6 +47,8 @@ const ROUTES: RouteSpec[] = [
 
   // users
   { method: "get", path: "/api/users", permission: "users:manage" },
+  { method: "post", path: "/api/users", permission: "users:manage" },
+  { method: "patch", path: "/api/users/some-id", permission: "users:manage" },
 
   // events
   { method: "post", path: "/api/events/track", permission: "events:view" },

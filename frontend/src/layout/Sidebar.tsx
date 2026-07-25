@@ -22,7 +22,8 @@ const LINKS: Array<{ to: string; label: string; permission: Permission }> = [
   { to: "/events", label: "Events", permission: "events:view" },
   { to: "/audit", label: "Audit", permission: "audit:view" },
   { to: "/monitoring", label: "Monitoring", permission: "monitoring:view" },
-  { to: "/dashboard-configs", label: "Configs", permission: "dashboard:configure" }
+  { to: "/dashboard-configs", label: "Configs", permission: "dashboard:configure" },
+  { to: "/users", label: "Users", permission: "users:manage" }
 ];
 
 export function Sidebar() {
