@@ -7,6 +7,8 @@ export const dashboardRangeSchema = z.object({
     startDate: z.string(),
     endDate: z.string(),
     interval: z.enum(["day", "week"]).optional(),
-    refresh: z.string().optional()
+    refresh: z.string().optional(),
+    // Opt-in: without it the response keeps its original flat shape.
+    compare: z.enum(["previous_period"]).optional()
   })
 });

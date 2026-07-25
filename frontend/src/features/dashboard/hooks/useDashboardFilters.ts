@@ -28,7 +28,8 @@ export function useDashboardFilters() {
       page: toPositiveInt(searchParams.get("page"), 1),
       pageSize: toPositiveInt(searchParams.get("pageSize"), 25),
       sortBy: searchParams.get("sortBy") ?? "",
-      sortDir: (searchParams.get("sortDir") as "asc" | "desc" | null) ?? ""
+      sortDir: (searchParams.get("sortDir") as "asc" | "desc" | null) ?? "",
+      compare: searchParams.get("compare") === "1"
     }),
     [defaults.endDate, defaults.startDate, searchParams]
   );

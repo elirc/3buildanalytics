@@ -8,7 +8,8 @@ export const dashboardController = {
       role: request.user!.role,
       startDate: String(request.query.startDate),
       endDate: String(request.query.endDate),
-      refresh: request.query.refresh === "true"
+      refresh: request.query.refresh === "true",
+      compare: request.query.compare === "previous_period"
     });
 
     response.status(200).json(result);
