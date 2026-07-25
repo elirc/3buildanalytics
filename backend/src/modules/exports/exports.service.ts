@@ -65,25 +65,56 @@ export const exportsService = {
     return { rowCount, willQueue: rowCount > MAX_SYNC_EXPORT_ROWS, maxSyncRows: MAX_SYNC_EXPORT_ROWS };
   },
 
-  async listForUser(userId: string) {
-    return exportsRepository.listByUser(userId);
+  /**
+   * @param includeAllUsers admins only — lets support see everyone's exports.
+   */
+  async listForUser(userId: string, options?: { includeAllUsers?: boolean }) {
+    return options?.includeAllUsers
+      ? exportsRepository.listAll()
+      : exportsRepository.listByUser(userId);
   },
 
-  async getById(userId: string, id: string) {
+  /**
+   * A SYSTEM_ADMIN may read any export; everyone else only their own.
+   *
+   * Without this an admin could not debug a colleague's failed export at all,
+   * which made the Export Center unsupportable.
+   */
+  async getById(userId: string, id: string, role?: Express.User["role"]) {
     const job = await exportsRepository.findById(id);
 
-    if (!job || job.requestedById !== userId) {
+    if (!job || (job.requestedById !== userId && role !== "SYSTEM_ADMIN")) {
       throw new AppError(ERROR_CODES.NOT_FOUND, "Export job not found", 404);
     }
 
     return job;
   },
 
-  async downloadForUser(userId: string, id: string) {
-    const job = await this.getById(userId, id);
+  async downloadForUser(userId: string, id: string, role?: Express.User["role"]) {
+    const job = await this.getById(userId, id, role);
+
+    if (job.status === ExportStatus.EXPIRED) {
+      throw new AppError(
+        ERROR_CODES.NOT_FOUND,
+        `This export expired after ${env.EXPORT_RETENTION_DAYS} days. Run it again to get a fresh copy.`,
+        404
+      );
+    }
 
     if (job.status !== ExportStatus.COMPLETED || !job.fileUrl || !job.fileName) {
       throw new AppError(ERROR_CODES.BAD_REQUEST, "Export is not ready for download", 400);
+    }
+
+    // Downloading someone else's export is a privileged read of data they
+    // requested, so it belongs in the audit trail with both identities.
+    if (job.requestedById !== userId) {
+      await auditService.record({
+        actorId: userId,
+        action: "EXPORT_DOWNLOADED_BY_ADMIN",
+        entityType: "ExportJob",
+        entityId: job.id,
+        metadata: { requestedById: job.requestedById, exportType: job.exportType }
+      });
     }
 
     return {
@@ -187,7 +218,7 @@ export const exportsService = {
         fileName,
         fileUrl: `${env.API_BASE_URL}/api/exports/${job.id}/download`,
         completedAt: new Date(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        expiresAt: new Date(Date.now() + env.EXPORT_RETENTION_DAYS * 24 * 60 * 60 * 1000)
       });
 
       await prisma.trackedEvent.create({

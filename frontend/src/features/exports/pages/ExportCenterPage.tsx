@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import {
   createExportJob,
+  daysUntilExpiry,
   describeFilters,
   downloadExportJob,
   estimateExport,
@@ -16,6 +17,8 @@ import { DataTable } from "../../../components/DataTable";
 import { QueryBoundary } from "../../../components/QueryBoundary";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
+import { useAuthStore } from "../../../auth/auth.store";
+import { hasPermission } from "../../../lib/permissions";
 import { formatDateTime, getDefaultDateRange } from "../../../lib/formatDate";
 
 const EXPORT_TYPES: Array<{ value: ExportType; label: string }> = [
@@ -51,6 +54,10 @@ const METRIC_TYPES = [
 export function ExportCenterPage() {
   const queryClient = useQueryClient();
   const defaultRange = getDefaultDateRange();
+  const role = useAuthStore((state) => state.user?.role);
+  const granted = useAuthStore((state) => state.user?.permissions);
+  const isAdmin = hasPermission(role, "users:manage", granted);
+  const [showAllUsers, setShowAllUsers] = useState(false);
 
   const [exportType, setExportType] = useState<ExportType>("TRACKED_EVENTS");
   const [filters, setFilters] = useState<ExportFilters>({
@@ -61,8 +68,8 @@ export function ExportCenterPage() {
   const [error, setError] = useState<string | null>(null);
 
   const exportJobsQuery = useQuery({
-    queryKey: ["exports"],
-    queryFn: getExportJobs,
+    queryKey: ["exports", showAllUsers],
+    queryFn: () => getExportJobs({ allUsers: showAllUsers }),
     // Poll only while something is actually in flight. A queued export used to
     // sit at PENDING until the user manually reloaded, because the global
     // staleTime is 60s and refetchOnWindowFocus is off.
@@ -231,6 +238,17 @@ export function ExportCenterPage() {
         {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
       </Card>
 
+      {isAdmin ? (
+        <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
+          <input
+            type="checkbox"
+            checked={showAllUsers}
+            onChange={(event) => setShowAllUsers(event.target.checked)}
+          />
+          Show exports from all users
+        </label>
+      ) : null}
+
       <QueryBoundary
         query={exportJobsQuery}
         loadingLabel="Loading export history..."
@@ -276,6 +294,18 @@ export function ExportCenterPage() {
                 render: (value) => formatDateTime(String(value))
               },
               { key: "rowCount", header: "Rows" },
+              {
+                key: "expiresAt",
+                header: "Expires",
+                render: (_value, row) => {
+                  const job = row as ExportJob;
+                  if (job.status === "EXPIRED") {
+                    return <span className="text-[var(--muted)]">Expired</span>;
+                  }
+                  const days = daysUntilExpiry(job);
+                  return days === null ? "—" : `in ${days}d`;
+                }
+              },
               {
                 key: "id",
                 header: "Actions",
