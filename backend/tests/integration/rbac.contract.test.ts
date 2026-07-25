@@ -94,7 +94,13 @@ const ROUTES: RouteSpec[] = [
   { method: "post", path: "/api/dashboard-configs", permission: "dashboard:configure" },
   { method: "get", path: "/api/dashboard-configs/some-id", permission: "dashboard:configure" },
   { method: "patch", path: "/api/dashboard-configs/some-id", permission: "dashboard:configure" },
-  { method: "delete", path: "/api/dashboard-configs/some-id", permission: "dashboard:configure" }
+  { method: "delete", path: "/api/dashboard-configs/some-id", permission: "dashboard:configure" },
+
+  // saved views
+  { method: "get", path: "/api/saved-views", permission: "views:manage" },
+  { method: "post", path: "/api/saved-views", permission: "views:manage" },
+  { method: "patch", path: "/api/saved-views/some-id", permission: "views:manage" },
+  { method: "delete", path: "/api/saved-views/some-id", permission: "views:manage" }
 ];
 
 const ALL_ROLES = Object.values(Role);
@@ -180,6 +186,7 @@ describe("RBAC contract", () => {
 /** Mount prefixes, longest first so "/api/dashboard-configs" wins over "/api/dashboard". */
 const MOUNT_PREFIXES = [
   "/api/dashboard-configs",
+  "/api/saved-views",
   "/api/audit-events",
   "/api/monitoring",
   "/api/dashboard",
