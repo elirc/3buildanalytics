@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { getDefaultDashboardConfig } from "../../../api/dashboardConfigs.api";
 import { useAuthStore } from "../../../auth/auth.store";
@@ -17,6 +17,7 @@ import { FALLBACK_LAYOUT, type DashboardLayout } from "../widgetRegistry";
 export function OperationsDashboardPage() {
   const { filters, updateFilters } = useDashboardFilters();
   const role = useAuthStore((state) => state.user?.role);
+  const queryClient = useQueryClient();
 
   const configQuery = useQuery({
     queryKey: ["dashboard-config", "default", role],
@@ -48,6 +49,7 @@ export function OperationsDashboardPage() {
         onApplySavedView={(saved) => updateFilters(saved)}
         compare={filters.compare}
         onCompareChange={(compare) => updateFilters({ compare: compare ? "1" : "" })}
+        onForceRefresh={() => queryClient.invalidateQueries({ queryKey: ["dashboard"] })}
       />
 
       <DashboardRenderer layout={layout} filters={filters} />
