@@ -11,15 +11,38 @@ export interface EventRow {
   metadata?: Record<string, unknown> | null;
 }
 
-export function getEvents(params: DateRangeParams & { eventType?: string; page?: number; pageSize?: number }) {
+export interface PagedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  /** Sent by the server so the client never has to recompute it. */
+  pageCount: number;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+}
+
+export type EventSortColumn = "occurredAt" | "eventType" | "actorEmail";
+
+export function getEvents(
+  params: DateRangeParams & {
+    eventType?: string;
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortDir?: string;
+  }
+) {
   const query = new URLSearchParams(
     Object.entries(params).reduce<Record<string, string>>((accumulator, [key, value]) => {
-      if (value !== undefined) accumulator[key] = String(value);
+      // Empty strings would be sent as `sortBy=` and rejected by the allowlist,
+      // so they are dropped alongside undefined.
+      if (value !== undefined && value !== "") accumulator[key] = String(value);
       return accumulator;
     }, {})
   ).toString();
 
-  return apiClient<{ items: EventRow[]; total: number; page: number; pageSize: number }>(`/api/events?${query}`);
+  return apiClient<PagedResponse<EventRow>>(`/api/events?${query}`);
 }
 
 export function getEventById(id: string) {
