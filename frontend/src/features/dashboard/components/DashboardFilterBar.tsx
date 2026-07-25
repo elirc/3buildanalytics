@@ -14,6 +14,9 @@ export function DashboardFilterBar(props: {
    * useful for surfaces where a saved filter set makes no sense.
    */
   savedViewsPage?: SavedViewPage;
+  /** Omit to hide the comparison toggle on surfaces where it makes no sense. */
+  compare?: boolean;
+  onCompareChange?: (compare: boolean) => void;
   currentFilters?: SavedViewFilters;
   onApplySavedView?: (filters: SavedViewFilters) => void;
 }) {
@@ -30,6 +33,16 @@ export function DashboardFilterBar(props: {
             currentFilters={props.currentFilters ?? {}}
             onApply={props.onApplySavedView}
           />
+        ) : null}
+        {props.onCompareChange ? (
+          <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
+            <input
+              type="checkbox"
+              checked={props.compare ?? false}
+              onChange={(event) => props.onCompareChange!(event.target.checked)}
+            />
+            Compare to previous period
+          </label>
         ) : null}
         <DateRangePicker startDate={props.startDate} endDate={props.endDate} onChange={props.onRangeChange} />
         <select

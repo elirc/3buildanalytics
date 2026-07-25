@@ -46,6 +46,8 @@ export function OperationsDashboardPage() {
           interval: filters.interval as "day" | "week"
         }}
         onApplySavedView={(saved) => updateFilters(saved)}
+        compare={filters.compare}
+        onCompareChange={(compare) => updateFilters({ compare: compare ? "1" : "" })}
       />
 
       <DashboardRenderer layout={layout} filters={filters} />

@@ -5,15 +5,30 @@ export interface DateRangeParams {
   endDate: string;
 }
 
+/**
+ * A KPI metric.
+ *
+ * Without ?compare it is a bare number; with it, an object carrying the
+ * previous period's value and the change. Both shapes are modelled so the
+ * comparison feature did not have to break every existing caller.
+ */
+export type KpiMetric = number | { value: number; previous: number | null; changePercent: number | null };
+
 export interface KpiSummary {
-  totalEvents: number;
-  activeUsers: number;
-  failedEvents: number;
-  errorRate: number;
-  csvExports: number;
-  adminActions?: number;
-  averageApiLatencyMs?: number;
-  backgroundJobFailures?: number;
+  totalEvents: KpiMetric;
+  activeUsers: KpiMetric;
+  failedEvents: KpiMetric;
+  errorRate: KpiMetric;
+  csvExports: KpiMetric;
+  // Absent when the caller's role may not see them (applyMetricVisibility).
+  adminActions?: KpiMetric;
+  averageApiLatencyMs?: KpiMetric;
+  backgroundJobFailures?: KpiMetric;
+  _meta?: {
+    source: "live" | "snapshot";
+    compare?: "previous_period";
+    previousPeriod?: { startDate: string; endDate: string };
+  };
 }
 
 export interface EventsOverTimeResponse {
@@ -28,10 +43,11 @@ export interface ErrorRatePoint {
   errorRate: number;
 }
 
-export function getKpiSummary(params: DateRangeParams) {
+export function getKpiSummary(params: DateRangeParams & { compare?: boolean }) {
   const query = new URLSearchParams({
     startDate: params.startDate,
-    endDate: params.endDate
+    endDate: params.endDate,
+    ...(params.compare ? { compare: "previous_period" } : {})
   }).toString();
   return apiClient<KpiSummary>(`/api/dashboard/kpi-summary?${query}`);
 }

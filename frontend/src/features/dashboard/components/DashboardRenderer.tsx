@@ -27,6 +27,7 @@ interface Filters {
   startDate: string;
   endDate: string;
   interval: string;
+  compare?: boolean;
 }
 
 /**
@@ -101,7 +102,7 @@ function Widget({
 }
 
 function KpiSummaryWidget({ filters }: { filters: Filters }) {
-  const query = useKpiSummary(filters.startDate, filters.endDate);
+  const query = useKpiSummary(filters.startDate, filters.endDate, filters.compare ?? false);
   return (
     <QueryBoundary query={query} loadingLabel="Loading KPI summary..." isEmpty={() => false}>
       {(data) => <KpiCardGrid data={data} />}
