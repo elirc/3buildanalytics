@@ -11,6 +11,8 @@ import { DataTable } from "../../../components/DataTable";
 import { QueryBoundary } from "../../../components/QueryBoundary";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
+import { LayoutEditor } from "../components/LayoutEditor";
+import { FALLBACK_LAYOUT, type LayoutWidget } from "../../dashboard/widgetRegistry";
 
 export function DashboardConfigPage() {
   const queryClient = useQueryClient();
@@ -22,6 +24,8 @@ export function DashboardConfigPage() {
   const [name, setName] = useState("");
   const [role, setRole] = useState("OPS_MANAGER");
   const [description, setDescription] = useState("");
+  const [widgets, setWidgets] = useState<LayoutWidget[]>(FALLBACK_LAYOUT.widgets);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const selectedConfig = useMemo(
     () => query.data?.find((config) => config.id === selectedId) ?? null,
@@ -42,7 +46,11 @@ export function DashboardConfigPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Parameters<typeof updateDashboardConfig>[1] }) =>
       updateDashboardConfig(id, payload),
-    onSuccess: () => refreshConfigs()
+    onSuccess: () => {
+      setSaveError(null);
+      refreshConfigs();
+    },
+    onError: (error: Error) => setSaveError(error.message)
   });
 
   const deleteMutation = useMutation({
@@ -92,7 +100,7 @@ export function DashboardConfigPage() {
               description,
               role,
               isDefault: false,
-              layoutJson: { widgets: ["kpi-summary", "events-over-time"] }
+              layoutJson: { widgets }
             })
           }
         >
@@ -123,6 +131,8 @@ export function DashboardConfigPage() {
                       setName(String(row.name));
                       setRole(String(row.role));
                       setDescription(String(row.description ?? ""));
+                      const layout = row.layoutJson as { widgets?: LayoutWidget[] } | null;
+                      setWidgets(layout?.widgets ?? []);
                     }}
                   >
                     Select
@@ -142,8 +152,9 @@ export function DashboardConfigPage() {
       </QueryBoundary>
       {selectedConfig ? (
         <Card className="space-y-4">
-          <h3 className="text-lg font-semibold">Edit selected config</h3>
-          <p className="text-sm text-[var(--muted)]">The current editor keeps layout changes simple and intentional for onboarding.</p>
+          <h3 className="text-lg font-semibold">Edit “{selectedConfig.name}”</h3>
+          <LayoutEditor widgets={widgets} onChange={setWidgets} />
+          {saveError ? <p className="text-sm text-[var(--danger)]">{saveError}</p> : null}
           <Button
             onClick={() =>
               updateMutation.mutate({
@@ -152,7 +163,9 @@ export function DashboardConfigPage() {
                   name,
                   description,
                   role,
-                  layoutJson: selectedConfig.layoutJson
+                  // Previously this passed selectedConfig.layoutJson straight
+                  // back, so "Save changes" could not change the layout at all.
+                  layoutJson: { widgets }
                 }
               })
             }
