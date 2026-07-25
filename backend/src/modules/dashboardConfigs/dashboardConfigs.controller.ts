@@ -1,9 +1,17 @@
+import type { Role } from "@prisma/client";
 import type { Request, Response } from "express";
 
 import { auditService } from "../audit/audit.service.js";
 import { dashboardConfigsService } from "./dashboardConfigs.service.js";
 
 export const dashboardConfigsController = {
+  async getDefault(request: Request, response: Response) {
+    // Defaults to the caller's own role, so the common case needs no argument.
+    const role = (request.query.role ? String(request.query.role) : request.user!.role) as Role;
+    const result = await dashboardConfigsService.getDefaultForRole(role, request.user!.role);
+    response.status(200).json(result);
+  },
+
   async list(_request: Request, response: Response) {
     const result = await dashboardConfigsService.list();
     response.status(200).json(result);

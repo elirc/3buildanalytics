@@ -93,6 +93,8 @@ const ROUTES: RouteSpec[] = [
   { method: "post", path: "/api/exports/some-id/retry", permission: "exports:create" },
 
   // dashboard configs
+  // Readable by anyone who can see a dashboard — they need their own layout.
+  { method: "get", path: "/api/dashboard-configs/default", permission: "dashboard:view" },
   { method: "get", path: "/api/dashboard-configs", permission: "dashboard:configure" },
   { method: "post", path: "/api/dashboard-configs", permission: "dashboard:configure" },
   { method: "get", path: "/api/dashboard-configs/some-id", permission: "dashboard:configure" },

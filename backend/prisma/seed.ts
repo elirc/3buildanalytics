@@ -147,8 +147,17 @@ async function main() {
       name: `${role} Default Dashboard`,
       description: `Seeded default dashboard for ${role}`,
       role,
+      // Objects with id and size, matching the layout schema. These used to be
+      // bare strings, which validated fine when nothing read them and would now
+      // be rejected on write — and silently render nothing if they slipped
+      // through.
       layoutJson: {
-        widgets: ["kpi-summary", "events-over-time", "recent-activity"]
+        widgets: [
+          { id: "kpi-summary", size: "full" },
+          { id: "events-over-time", size: "half" },
+          { id: "events-by-type", size: "half" },
+          { id: "recent-activity", size: "full" }
+        ]
       },
       isDefault: true
     }))
