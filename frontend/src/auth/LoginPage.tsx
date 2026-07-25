@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { login } from "../api/auth.api";
@@ -19,8 +19,14 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const setSession = useAuthStore((state) => state.setSession);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // RequireAuth records where the user was headed before it bounced them here.
+  // Sending them back there means an expired session costs them their place for
+  // one login, not for the rest of the session.
+  const returnTo = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/";
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -34,7 +40,7 @@ export function LoginPage() {
     mutationFn: login,
     onSuccess: (session) => {
       setSession(session);
-      navigate("/");
+      navigate(returnTo, { replace: true });
     },
     onError: (error) => {
       setErrorMessage(error.message);
