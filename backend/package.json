@@ -18,7 +18,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "jobs:backfill": "tsx src/scripts/backfillSnapshots.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

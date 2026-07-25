@@ -111,6 +111,10 @@ model MetricSnapshot {
 
   @@index([metricKey])
   @@index([periodStart, periodEnd])
+  // Makes the nightly rollup idempotent: re-running for a day overwrites that
+  // day's row instead of appending a duplicate. Without it a retried job
+  // doubles every number it produced.
+  @@unique([metricKey, periodStart, periodEnd])
 }
 
 model DashboardConfig {
