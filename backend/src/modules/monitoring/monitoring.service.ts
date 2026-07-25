@@ -1,6 +1,7 @@
 import { MonitoringMetricType, type Prisma } from "@prisma/client";
 
 import { cacheKeys } from "../../cache/cacheKeys.js";
+import { getQueueCounts } from "../../jobs/queue.js";
 import { cacheService } from "../../cache/cache.service.js";
 import { parseDateRange, toIsoDate } from "../../shared/utils/dates.js";
 import { monitoringRepository } from "./monitoring.repository.js";
@@ -90,8 +91,31 @@ export const monitoringService = {
     }));
   },
 
+  /**
+   * Queue depth from two sources, deliberately reported side by side.
+   *
+   * `jobs` counts ExportJob rows by status. That was the only source, and it is
+   * a proxy: it cannot see a job sitting in Redis with no consumer, cannot see
+   * delayed or retrying jobs, and survives a Redis flush that emptied the real
+   * queue.
+   *
+   * `queue` is BullMQ's own count. Showing both is the point — a divergence
+   * between them *is* the signal that something is wrong, and collapsing them
+   * into one number would throw that signal away.
+   */
   async getQueueDepth() {
-    return monitoringRepository.getQueueDepth();
+    const [jobs, queue] = await Promise.all([
+      monitoringRepository.getQueueDepth(),
+      getQueueCounts()
+    ]);
+
+    return {
+      // Kept at the top level so existing callers reading `.total` still work.
+      ...jobs,
+      jobs,
+      queue,
+      redisAvailable: queue !== null
+    };
   },
 
   async getRecentJobFailures(input: { startDate: string; endDate: string }) {
