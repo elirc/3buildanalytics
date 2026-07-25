@@ -7,6 +7,7 @@ import { sha256 } from "../../shared/utils/hash.js";
 import { hashPassword, verifyPassword } from "../../shared/utils/password.js";
 import { parseDurationToMs } from "../../shared/utils/duration.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../../shared/utils/jwt.js";
+import { getPermissionsForRole } from "../../shared/permissions.js";
 import { auditService } from "../audit/audit.service.js";
 
 interface RegisterInput {
@@ -214,6 +215,10 @@ function sanitizeUser(user: {
     role: user.role,
     isActive: user.isActive,
     createdAt: user.createdAt,
-    updatedAt: user.updatedAt
+    updatedAt: user.updatedAt,
+    // Shipped with the session so the UI can render the correct navigation on
+    // first paint, without a second round trip and without duplicating the
+    // matrix as the client's own source of truth.
+    permissions: getPermissionsForRole(user.role)
   };
 }

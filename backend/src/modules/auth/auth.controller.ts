@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 
+import { getPermissionsForRole } from "../../shared/permissions.js";
 import { authService } from "./auth.service.js";
 
 export const authController = {
@@ -26,6 +27,13 @@ export const authController = {
 
     const result = await authService.getCurrentUser(request.user!.id);
     response.status(200).json(result);
+  },
+
+  async permissions(request: Request, response: Response) {
+    response.status(200).json({
+      role: request.user!.role,
+      permissions: getPermissionsForRole(request.user!.role)
+    });
   },
 
   async refresh(request: Request, response: Response) {
