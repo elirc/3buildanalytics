@@ -11,7 +11,9 @@ export const auditController = {
       actorId: request.query.actorId ? String(request.query.actorId) : undefined,
       entityType: request.query.entityType ? String(request.query.entityType) : undefined,
       page: request.query.page ? Number(request.query.page) : undefined,
-      pageSize: request.query.pageSize ? Number(request.query.pageSize) : undefined
+      pageSize: request.query.pageSize ? Number(request.query.pageSize) : undefined,
+      sortBy: request.query.sortBy ? String(request.query.sortBy) : undefined,
+      sortDir: request.query.sortDir ? String(request.query.sortDir) : undefined
     });
 
     response.status(200).json(result);

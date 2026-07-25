@@ -20,6 +20,8 @@ export const eventsService = {
     search?: string;
     page?: number;
     pageSize?: number;
+    sortBy?: string;
+    sortDir?: string;
   }) {
     const range = parseDateRange(filters.startDate, filters.endDate);
     return eventsRepository.findMany({ ...filters, ...range });

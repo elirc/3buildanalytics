@@ -34,6 +34,8 @@ export const auditService = {
     entityType?: string;
     page?: number;
     pageSize?: number;
+    sortBy?: string;
+    sortDir?: string;
   }) {
     const range = parseDateRange(input.startDate, input.endDate);
     return auditRepository.list({ ...input, ...range });

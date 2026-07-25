@@ -10,7 +10,9 @@ export const listAuditSchema = z.object({
     actorId: z.string().optional(),
     entityType: z.string().optional(),
     page: z.coerce.number().optional(),
-    pageSize: z.coerce.number().optional()
+    pageSize: z.coerce.number().optional(),
+    sortBy: z.string().optional(),
+    sortDir: z.enum(["asc", "desc"]).optional()
   })
 });
 
