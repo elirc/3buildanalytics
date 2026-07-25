@@ -9,7 +9,7 @@ import { EventsByTypeChart } from "../../dashboard/components/EventsByTypeChart"
 import { MetricSeriesChart } from "../../dashboard/components/MetricSeriesChart";
 import { useDashboardFilters } from "../../dashboard/hooks/useDashboardFilters";
 import { DataTable } from "../../../components/DataTable";
-import { formatDate } from "../../../lib/formatDate";
+import { formatDateTime } from "../../../lib/formatDate";
 
 export function AuditDashboardPage() {
   const { filters, updateFilters } = useDashboardFilters();
@@ -76,7 +76,8 @@ export function AuditDashboardPage() {
               {
                 key: "createdAt",
                 header: "Created",
-                render: (value) => formatDate(String(value))
+                // Audit entries cluster within a day; the time is the useful part.
+                render: (value) => formatDateTime(String(value))
               }
             ]}
           />

@@ -68,6 +68,39 @@ describe("dashboard KPI summary", () => {
     }
   });
 
+  /**
+   * US-02's headline acceptance criterion, asserted end to end rather than in a
+   * unit test: an event recorded *right now* must appear in a range that ends
+   * today. It used not to, because endDate resolved to midnight UTC and so
+   * excluded the whole current day.
+   */
+  it("includes an event recorded today in a range that ends today", async () => {
+    const admin = await createUser({ role: "SYSTEM_ADMIN" });
+    const now = new Date();
+    await createTrackedEvents({ count: 3, occurredAt: now });
+
+    const today = now.toISOString().slice(0, 10);
+    const response = await request(app)
+      .get("/api/dashboard/kpi-summary")
+      .query({ startDate: today, endDate: today })
+      .set(authHeaderFor(admin));
+
+    expect(response.status).toBe(200);
+    expect(response.body.totalEvents).toBe(3);
+  });
+
+  it("rejects an impossible calendar date rather than silently rolling it over", async () => {
+    const admin = await createUser({ role: "SYSTEM_ADMIN" });
+
+    const response = await request(app)
+      .get("/api/dashboard/kpi-summary")
+      .query({ startDate: "2026-02-31", endDate: "2026-03-05" })
+      .set(authHeaderFor(admin));
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("BAD_REQUEST");
+  });
+
   it("requires both startDate and endDate", async () => {
     const admin = await createUser({ role: "SYSTEM_ADMIN" });
 
