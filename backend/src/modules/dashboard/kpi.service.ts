@@ -47,7 +47,7 @@ export const kpiService = {
     if (!input.refresh) {
       const cached = await cacheService.get<Record<string, unknown>>(key);
       if (cached) {
-        return cached;
+        return { ...cached, _cache: "HIT" as const };
       }
     }
 
@@ -55,7 +55,7 @@ export const kpiService = {
       const current = await summarise(range.startDate, range.endDate);
       const visible = applyMetricVisibility(input.role, current);
       await cacheService.set(key, visible, 300);
-      return visible;
+      return { ...visible, _cache: input.refresh ? ("BYPASS" as const) : ("MISS" as const) };
     }
 
     const previous = previousPeriod(range.startDate, range.endDate);
@@ -101,7 +101,7 @@ export const kpiService = {
     }
 
     await cacheService.set(key, result, 300);
-    return result;
+    return { ...result, _cache: input.refresh ? ("BYPASS" as const) : ("MISS" as const) };
   }
 };
 

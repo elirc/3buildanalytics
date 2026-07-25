@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { AppError } from "../../shared/errors/AppError.js";
 import { ERROR_CODES } from "../../shared/errors/errorCodes.js";
 import { parseDateRange, toIsoDate } from "../../shared/utils/dates.js";
+import { cacheInvalidator } from "../../cache/cacheInvalidator.js";
 import { auditRepository } from "./audit.repository.js";
 
 export const auditService = {
@@ -15,7 +16,7 @@ export const auditService = {
     ipAddress?: string;
     userAgent?: string;
   }) {
-    return auditRepository.create({
+    const event = await auditRepository.create({
       actorId: input.actorId,
       action: input.action,
       entityType: input.entityType,
@@ -24,6 +25,10 @@ export const auditService = {
       ipAddress: input.ipAddress,
       userAgent: input.userAgent
     });
+
+    await cacheInvalidator.onAuditEvent();
+
+    return event;
   },
 
   async list(input: {
