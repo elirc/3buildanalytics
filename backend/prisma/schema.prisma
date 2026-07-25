@@ -21,6 +21,32 @@ model User {
   auditEvents  AuditEvent[]
   exportJobs   ExportJob[]
   tokens       RefreshToken[]
+  savedViews   SavedView[]
+}
+
+/// A named, reusable set of dashboard filters.
+///
+/// filtersJson holds whatever useDashboardFilters puts in the URL — dates,
+/// interval, event type, page size, sort. Storing the query-string shape rather
+/// than named columns means adding a new filter needs no migration; the cost is
+/// that the column is unvalidated at the database level, so the service
+/// validates it on write.
+model SavedView {
+  id          String   @id @default(uuid())
+  name        String
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  page        String
+  filtersJson Json
+  isShared    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([page])
+  // One name per page per owner. Without this, "Last week's errors" can exist
+  // three times and the dropdown becomes useless.
+  @@unique([ownerId, page, name])
 }
 
 model TrackedEvent {
