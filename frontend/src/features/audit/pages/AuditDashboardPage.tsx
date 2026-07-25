@@ -1,14 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getAuditEvents, getAuditOverTime, getAuditSummaryByAction, getAuditSummaryByActor } from "../../../api/audit.api";
-import { ErrorState } from "../../../components/ErrorState";
-import { LoadingState } from "../../../components/LoadingState";
+import { DataTable } from "../../../components/DataTable";
+import { QueryBoundary } from "../../../components/QueryBoundary";
 import { ChartCard } from "../../dashboard/components/ChartCard";
 import { DashboardFilterBar } from "../../dashboard/components/DashboardFilterBar";
 import { EventsByTypeChart } from "../../dashboard/components/EventsByTypeChart";
 import { MetricSeriesChart } from "../../dashboard/components/MetricSeriesChart";
 import { useDashboardFilters } from "../../dashboard/hooks/useDashboardFilters";
-import { DataTable } from "../../../components/DataTable";
 import { formatDateTime } from "../../../lib/formatDate";
 
 export function AuditDashboardPage() {
@@ -33,14 +32,6 @@ export function AuditDashboardPage() {
     queryFn: () => getAuditOverTime({ startDate: filters.startDate, endDate: filters.endDate })
   });
 
-  if (actionQuery.isLoading) {
-    return <LoadingState label="Loading audit dashboard..." />;
-  }
-
-  if (actionQuery.isError || !actionQuery.data) {
-    return <ErrorState message={actionQuery.error?.message ?? "Failed to load audit charts"} />;
-  }
-
   return (
     <div className="space-y-6">
       <DashboardFilterBar
@@ -50,40 +41,58 @@ export function AuditDashboardPage() {
         onRangeChange={(range) => updateFilters(range)}
         onIntervalChange={(interval) => updateFilters({ interval })}
       />
+
       <div className="grid gap-6 xl:grid-cols-2">
         <ChartCard title="Actions by type" description="Compliance-facing aggregation by audit action.">
-          <EventsByTypeChart data={actionQuery.data.map((item) => ({ eventType: item.action, count: item.count }))} />
+          <QueryBoundary query={actionQuery} loadingLabel="Loading audit actions...">
+            {(data) => (
+              <EventsByTypeChart data={data.map((item) => ({ eventType: item.action, count: item.count }))} />
+            )}
+          </QueryBoundary>
         </ChartCard>
         <ChartCard title="Actions by actor" description="Top actors across the selected audit range.">
-          <EventsByTypeChart data={(actorQuery.data ?? []).map((item) => ({ eventType: item.actor, count: item.count }))} />
+          <QueryBoundary query={actorQuery} loadingLabel="Loading actors...">
+            {(data) => (
+              <EventsByTypeChart data={data.map((item) => ({ eventType: item.actor, count: item.count }))} />
+            )}
+          </QueryBoundary>
         </ChartCard>
       </div>
+
       <ChartCard title="Audit activity over time" description="Server-side grouping shows when compliance-sensitive activity clusters.">
-        {auditOverTimeQuery.data ? <MetricSeriesChart data={auditOverTimeQuery.data} color="#b73c20" dataKey="count" /> : <LoadingState label="Loading audit trend..." />}
+        <QueryBoundary query={auditOverTimeQuery} loadingLabel="Loading audit trend...">
+          {(data) => <MetricSeriesChart data={data} color="#b73c20" dataKey="count" />}
+        </QueryBoundary>
       </ChartCard>
+
       <ChartCard title="Recent audit events" description="Audit records remain server-filtered and paginated.">
-        {auditEventsQuery.data ? (
-          <DataTable
-            rows={auditEventsQuery.data.items}
-            columns={[
-              { key: "action", header: "Action" },
-              {
-                key: "actor",
-                header: "Actor",
-                render: (value) => (value && typeof value === "object" && "email" in value ? String(value.email) : "Unknown")
-              },
-              { key: "entityType", header: "Entity" },
-              {
-                key: "createdAt",
-                header: "Created",
-                // Audit entries cluster within a day; the time is the useful part.
-                render: (value) => formatDateTime(String(value))
-              }
-            ]}
-          />
-        ) : (
-          <LoadingState label="Loading audit records..." />
-        )}
+        <QueryBoundary
+          query={auditEventsQuery}
+          loadingLabel="Loading audit records..."
+          emptyMessage="No audit events in the selected range."
+          isEmpty={(data) => data.items.length === 0}
+        >
+          {(data) => (
+            <DataTable
+              rows={data.items}
+              columns={[
+                { key: "action", header: "Action" },
+                {
+                  key: "actor",
+                  header: "Actor",
+                  render: (value) => (value && typeof value === "object" && "email" in value ? String(value.email) : "Unknown")
+                },
+                { key: "entityType", header: "Entity" },
+                {
+                  key: "createdAt",
+                  header: "Created",
+                  // Audit entries cluster within a day; the time is the useful part.
+                  render: (value) => formatDateTime(String(value))
+                }
+              ]}
+            />
+          )}
+        </QueryBoundary>
       </ChartCard>
     </div>
   );

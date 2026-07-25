@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getEventsOverTime, getKpiSummary } from "../../../api/dashboard.api";
-import { ErrorState } from "../../../components/ErrorState";
-import { LoadingState } from "../../../components/LoadingState";
+import { QueryBoundary } from "../../../components/QueryBoundary";
 import { ChartCard } from "../components/ChartCard";
 import { DashboardFilterBar } from "../components/DashboardFilterBar";
 import { EventsOverTimeChart } from "../components/EventsOverTimeChart";
@@ -20,14 +19,6 @@ export function ExecutiveDashboardPage() {
     queryFn: () => getEventsOverTime({ startDate: filters.startDate, endDate: filters.endDate, interval: filters.interval })
   });
 
-  if (kpis.isLoading) {
-    return <LoadingState label="Loading executive summary..." />;
-  }
-
-  if (kpis.isError || !kpis.data) {
-    return <ErrorState message={kpis.error?.message ?? "Failed to load executive dashboard"} />;
-  }
-
   return (
     <div className="space-y-6">
       <DashboardFilterBar
@@ -37,9 +28,19 @@ export function ExecutiveDashboardPage() {
         onRangeChange={(range) => updateFilters(range)}
         onIntervalChange={(interval) => updateFilters({ interval })}
       />
-      <KpiCardGrid data={kpis.data} />
+
+      <QueryBoundary query={kpis} loadingLabel="Loading executive summary..." isEmpty={() => false}>
+        {(data) => <KpiCardGrid data={data} />}
+      </QueryBoundary>
+
       <ChartCard title="Trend overview" description="Executive views stay summary-first and avoid raw operational feeds.">
-        {trend.data ? <EventsOverTimeChart data={trend.data.data} /> : <LoadingState label="Loading summary trend..." />}
+        <QueryBoundary
+          query={trend}
+          loadingLabel="Loading summary trend..."
+          isEmpty={(data) => data.data.length === 0}
+        >
+          {(data) => <EventsOverTimeChart data={data.data} />}
+        </QueryBoundary>
       </ChartCard>
     </div>
   );

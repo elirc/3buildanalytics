@@ -15,12 +15,15 @@ export function EventDetailPage() {
     enabled: Boolean(id)
   });
 
-  if (query.isLoading) {
+  if (query.isPending) {
     return <LoadingState label="Loading event details..." />;
   }
 
   if (query.isError || !query.data) {
-    return <ErrorState message={query.error?.message ?? "Failed to load event details"} />;
+    // Pass the error object, not just its message, so ErrorState can tell a
+    // 403 ("you can't see this") from a 500 ("try again") and offer the right
+    // affordance for each.
+    return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   }
 
   return (

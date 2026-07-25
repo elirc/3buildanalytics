@@ -8,7 +8,7 @@ import {
   updateDashboardConfig
 } from "../../../api/dashboardConfigs.api";
 import { DataTable } from "../../../components/DataTable";
-import { LoadingState } from "../../../components/LoadingState";
+import { QueryBoundary } from "../../../components/QueryBoundary";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 
@@ -99,9 +99,14 @@ export function DashboardConfigPage() {
           Create config
         </Button>
       </Card>
-      {query.data ? (
+      <QueryBoundary
+        query={query}
+        loadingLabel="Loading dashboard configs..."
+        emptyMessage="No dashboard configs yet."
+      >
+        {(configs) => (
         <DataTable
-          rows={query.data}
+          rows={configs}
           columns={[
             { key: "name", header: "Name" },
             { key: "role", header: "Role" },
@@ -133,9 +138,8 @@ export function DashboardConfigPage() {
             }
           ]}
         />
-      ) : (
-        <LoadingState label="Loading dashboard configs..." />
-      )}
+        )}
+      </QueryBoundary>
       {selectedConfig ? (
         <Card className="space-y-4">
           <h3 className="text-lg font-semibold">Edit selected config</h3>
