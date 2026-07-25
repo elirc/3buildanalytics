@@ -27,11 +27,26 @@ export interface ExportJob {
   fileUrl?: string | null;
   errorMessage?: string | null;
   completedAt?: string | null;
+  expiresAt?: string | null;
   filtersJson?: ExportFilters | null;
+  /** Present only in the admin (?all=true) listing. */
+  requestedBy?: { id: string; email: string; firstName: string; lastName: string };
 }
 
-export function getExportJobs() {
-  return apiClient<ExportJob[]>("/api/exports");
+export function getExportJobs(options?: { allUsers?: boolean }) {
+  // ?all=true is honoured only for admins; the API quietly returns the caller's
+  // own list otherwise, so this is safe to send unconditionally.
+  return apiClient<ExportJob[]>(`/api/exports${options?.allUsers ? "?all=true" : ""}`);
+}
+
+/** Days remaining before an export expires, or null when it has none. */
+export function daysUntilExpiry(job: ExportJob) {
+  if (!job.expiresAt || job.status !== "COMPLETED") {
+    return null;
+  }
+
+  const millis = new Date(job.expiresAt).getTime() - Date.now();
+  return Math.max(0, Math.ceil(millis / 86_400_000));
 }
 
 export function createExportJob(payload: { exportType: ExportType; filters: ExportFilters }) {

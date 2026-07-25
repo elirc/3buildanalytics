@@ -125,20 +125,21 @@ async function main() {
     data: monitoringMetrics
   });
 
+  // Seeded as PENDING with no file.
+  //
+  // These used to be COMPLETED with fileName "export-N.csv" — files the seed
+  // never wrote. Clicking Download on a freshly seeded database therefore hit a
+  // path that did not exist, which is a confusing first impression and (before
+  // the stream now has an error handler) failed messily.
+  //
+  // A row must never advertise an artifact that is not there.
   await prisma.exportJob.createMany({
-    data: users.flatMap((user, index) => [
-      {
-        requestedById: user.id,
-        exportType: Object.values(ExportType)[index % Object.values(ExportType).length]!,
-        status: ExportStatus.COMPLETED,
-        filtersJson: { startDate: "2026-05-01", endDate: "2026-05-31" },
-        fileName: `export-${index}.csv`,
-        fileUrl: `/exports/export-${index}.csv`,
-        rowCount: 200 + index,
-        completedAt: now,
-        expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-      }
-    ])
+    data: users.map((user, index) => ({
+      requestedById: user.id,
+      exportType: Object.values(ExportType)[index % Object.values(ExportType).length]!,
+      status: ExportStatus.PENDING,
+      filtersJson: { startDate: "2026-05-01", endDate: "2026-05-31" }
+    }))
   });
 
   await prisma.dashboardConfig.createMany({

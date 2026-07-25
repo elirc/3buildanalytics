@@ -12,6 +12,16 @@ export const exportsRepository = {
     });
   },
 
+  /** Admin view. Includes the requester's email so a support view is readable. */
+  listAll() {
+    return prisma.exportJob.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        requestedBy: { select: { id: true, email: true, firstName: true, lastName: true } }
+      }
+    });
+  },
+
   findById(id: string) {
     return prisma.exportJob.findUnique({
       where: { id }
