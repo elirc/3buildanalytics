@@ -23,7 +23,9 @@ export type Permission =
   | "exports:create"
   | "exports:view"
   | "views:manage"
-  | "alerts:manage";
+  | "alerts:manage"
+  | "events:write"
+  | "monitoring:write";
 
 export const PERMISSIONS: Record<Role, readonly Permission[]> = {
   SYSTEM_ADMIN: [
@@ -36,7 +38,9 @@ export const PERMISSIONS: Record<Role, readonly Permission[]> = {
     "exports:create",
     "exports:view",
     "views:manage",
-    "alerts:manage"
+    "alerts:manage",
+    "events:write",
+    "monitoring:write"
   ],
   OPS_MANAGER: [
     "dashboard:view",
@@ -44,7 +48,8 @@ export const PERMISSIONS: Record<Role, readonly Permission[]> = {
     "events:view",
     "exports:create",
     "exports:view",
-    "views:manage"
+    "views:manage",
+    "events:write"
   ],
   PRODUCT_MANAGER: [
     "dashboard:view",
@@ -52,7 +57,8 @@ export const PERMISSIONS: Record<Role, readonly Permission[]> = {
     "events:view",
     "exports:create",
     "exports:view",
-    "views:manage"
+    "views:manage",
+    "events:write"
   ],
   ENGINEERING_ADMIN: [
     "dashboard:view",
@@ -61,9 +67,11 @@ export const PERMISSIONS: Record<Role, readonly Permission[]> = {
     "exports:create",
     "exports:view",
     "views:manage",
-    "alerts:manage"
+    "alerts:manage",
+    "events:write",
+    "monitoring:write"
   ],
-  AUDIT_VIEWER: ["dashboard:view", "audit:view", "exports:create", "exports:view", "views:manage"],
+  AUDIT_VIEWER: ["dashboard:view", "audit:view", "exports:create", "exports:view", "views:manage", "events:write"],
   EXECUTIVE_VIEWER: ["dashboard:view"],
   READ_ONLY: ["dashboard:view"]
 };
