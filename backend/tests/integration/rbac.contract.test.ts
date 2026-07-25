@@ -86,6 +86,7 @@ const ROUTES: RouteSpec[] = [
 
   // exports
   { method: "post", path: "/api/exports", permission: "exports:create" },
+  { method: "post", path: "/api/exports/estimate", permission: "exports:create" },
   { method: "get", path: "/api/exports", permission: "exports:view" },
   { method: "get", path: "/api/exports/some-id", permission: "exports:view" },
   { method: "get", path: "/api/exports/some-id/download", permission: "exports:view" },

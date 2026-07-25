@@ -1,0 +1,4 @@
+id,eventType,actorEmail,entityType,entityId,occurredAt
+"33ce5cd6-6bbb-4edb-87b6-ea759cf7b391","FEATURE_USED","actor-19@example.com","User","entity-19","2026-01-15T12:00:00.000Z"
+"6b74fa8f-50d6-4883-ac25-b77cbf327846","FEATURE_USED","actor-18@example.com","User","entity-18","2026-01-15T12:00:00.000Z"
+"d895e347-60e5-4dfd-9663-133d59b9495e","FEATURE_USED","actor-17@example.com","User","entity-17","2026-01-15T12:00:00.000Z"
