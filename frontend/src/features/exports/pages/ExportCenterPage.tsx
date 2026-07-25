@@ -60,7 +60,21 @@ export function ExportCenterPage() {
   const [estimate, setEstimate] = useState<{ rowCount: number; willQueue: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const exportJobsQuery = useQuery({ queryKey: ["exports"], queryFn: getExportJobs });
+  const exportJobsQuery = useQuery({
+    queryKey: ["exports"],
+    queryFn: getExportJobs,
+    // Poll only while something is actually in flight. A queued export used to
+    // sit at PENDING until the user manually reloaded, because the global
+    // staleTime is 60s and refetchOnWindowFocus is off.
+    refetchInterval: (query) => {
+      const jobs = query.state.data;
+      if (!jobs) {
+        return false;
+      }
+      const inFlight = jobs.some((job) => job.status === "PENDING" || job.status === "PROCESSING");
+      return inFlight ? 3000 : false;
+    }
+  });
 
   // Filters are per-type; carrying eventType into an audit export would be
   // rejected by the API's .strict() schema.
@@ -234,7 +248,28 @@ export function ExportCenterPage() {
                 // "which one was the API errors?" is unanswerable.
                 render: (_value, row) => describeFilters(row as ExportJob)
               },
-              { key: "status", header: "Status" },
+              {
+                key: "status",
+                header: "Status",
+                render: (value, row) => {
+                  const job = row as ExportJob;
+                  const isRunning = value === "PENDING" || value === "PROCESSING";
+
+                  return (
+                    <div>
+                      <span className={isRunning ? "text-[var(--muted)]" : undefined}>
+                        {String(value)}
+                        {isRunning ? " …" : ""}
+                      </span>
+                      {/* errorMessage was stored and returned but never shown,
+                          so a failed export gave the user nothing to act on. */}
+                      {job.status === "FAILED" && job.errorMessage ? (
+                        <p className="mt-1 max-w-xs text-xs text-[var(--danger)]">{job.errorMessage}</p>
+                      ) : null}
+                    </div>
+                  );
+                }
+              },
               {
                 key: "createdAt",
                 header: "Created",
