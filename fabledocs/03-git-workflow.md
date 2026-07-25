@@ -134,15 +134,68 @@ If you are about to change something and cannot tell why it is the way it is,
 
 Story-by-story progress against [`02-user-stories.md`](02-user-stories.md).
 
-| Story | Status | PR |
+**All twenty stories are merged.** Every PR had five green CI checks before it
+went in.
+
+| # | Story | PR |
 | --- | --- | --- |
-| US-20 Database-backed tests and CI | **Merged** | [#1](https://github.com/elirc/3buildanalytics/pull/1) |
-| US-01 Navigation matches real permissions | **Merged** | [#3](https://github.com/elirc/3buildanalytics/pull/3) |
-| US-02 … US-19 | Not started | — |
+| US-20 | Database-backed tests and CI | [#1](https://github.com/elirc/3buildanalytics/pull/1) |
+| US-01 | Navigation matches real permissions | [#3](https://github.com/elirc/3buildanalytics/pull/3) |
+| US-02 | Date ranges stop dropping today | [#4](https://github.com/elirc/3buildanalytics/pull/4) |
+| US-03 | Every page handles the error state | [#5](https://github.com/elirc/3buildanalytics/pull/5) |
+| US-04 | Sessions stay alive; rotation actually rotates | [#6](https://github.com/elirc/3buildanalytics/pull/6) |
+| US-05 | Paginate and sort the event log | [#7](https://github.com/elirc/3buildanalytics/pull/7) |
+| US-06 | Saved views for dashboard filters | [#8](https://github.com/elirc/3buildanalytics/pull/8) |
+| US-07 | User administration; open registration closed | [#9](https://github.com/elirc/3buildanalytics/pull/9) |
+| US-08 | Export builder with real filters | [#10](https://github.com/elirc/3buildanalytics/pull/10) |
+| US-09 | Correct export retry and live status | [#11](https://github.com/elirc/3buildanalytics/pull/11) |
+| US-10 | Export retention, expiry, admin visibility | [#12](https://github.com/elirc/3buildanalytics/pull/12) |
+| US-11 | Dashboard configs drive the layout | [#13](https://github.com/elirc/3buildanalytics/pull/13) |
+| US-12 | Metric snapshot rollup job | [#14](https://github.com/elirc/3buildanalytics/pull/14) |
+| US-13 | A real monitoring page with alert rules | [#15](https://github.com/elirc/3buildanalytics/pull/15) |
+| US-14 | Period-over-period KPI comparison | [#16](https://github.com/elirc/3buildanalytics/pull/16) |
+| US-15 | Queue depth from BullMQ; real readiness probe | [#17](https://github.com/elirc/3buildanalytics/pull/17) |
+| US-16 | Cache invalidation; a refresh guard that was a no-op | [#18](https://github.com/elirc/3buildanalytics/pull/18) |
+| US-17 | Summary aggregation pushed into SQL | [#19](https://github.com/elirc/3buildanalytics/pull/19) |
+| US-18 | Distributed rate limiting | [#20](https://github.com/elirc/3buildanalytics/pull/20) |
+| US-19 | Monitoring metrics made real | [#21](https://github.com/elirc/3buildanalytics/pull/21) |
 
 US-20 was pulled ahead of US-01 for the reason given in its PR: every other
 story asks for integration tests, and until CI ran a database none of them
 could have been written.
 
-Two defects were found and deferred to US-04, and one (the Redis hang) was
-fixed in US-20 because the test suite could not run without it.
+## What the work actually found
+
+The backlog was written from reading the code. Building it turned up things
+reading could not, and those are the most useful pages in this history:
+
+- **A "security control" that did nothing.** US-16 opened by *testing* whether
+  `metricVisibilityMiddleware` restricted `?refresh=true`. It did not — Express
+  re-parses `req.query`, so the assignment was discarded and any user could
+  force full recomputation. The commit that proves it is worth more than the
+  fix.
+- **Rotation that rotated nothing.** Refresh tokens had no nonce, so two minted
+  in the same second were identical. US-20 found it, US-04 fixed it.
+- **"Graceful degradation" that hung instead.** Twice — the cache client
+  (US-20) and BullMQ's `getJobCounts` (US-15). Both *waited* rather than
+  failing, so the surrounding `try/catch` never ran. Lesson: bound the
+  operation yourself; do not trust a library's timeout defaults.
+- **A test suite that skipped itself.** US-18's rate-limit tests reported green
+  in CI while doing nothing, because a cold `lazyConnect` client failed its
+  first `ping()`. Tests that skip quietly are worse than tests that fail.
+- **CI catching what a laptop could not.** US-12 passed locally and failed in
+  CI: `resetDatabase()` truncated tables but never cleared Redis, and there is
+  no Redis on the dev machine. An argument for CI running the real
+  dependencies.
+
+## Reading this history
+
+```bash
+git log --oneline --graph          # 20 merges, each a story
+gh pr view 11                      # the export-retry bug, explained in full
+git log -p -- backend/src/cache/   # how one area evolved
+```
+
+Start with [#11](https://github.com/elirc/3buildanalytics/pull/11) if you want
+one PR that shows the house style: a real bug, the reasoning, and the test that
+stops it coming back.
