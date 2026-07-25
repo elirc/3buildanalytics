@@ -15,6 +15,7 @@ import { ErrorRateChart } from "./ErrorRateChart";
 import { EventsByTypeChart } from "./EventsByTypeChart";
 import { EventsOverTimeChart } from "./EventsOverTimeChart";
 import { KpiCard } from "./KpiCard";
+import { QueueDepthPanel } from "./QueueDepthPanel";
 import { KpiCardGrid } from "./KpiCardGrid";
 import { MetricSeriesChart } from "./MetricSeriesChart";
 import { RecentActivityTable } from "./RecentActivityTable";
@@ -228,7 +229,7 @@ function QueueDepthWidget({ title, description }: { title: string; description: 
   return (
     <ChartCard title={title} description={description}>
       <QueryBoundary query={query} loadingLabel="Loading queue depth..." isEmpty={() => false}>
-        {(data) => <KpiCard label="Queue backlog" value={String(data.total)} />}
+        {(data) => <QueueDepthPanel data={data} />}
       </QueryBoundary>
     </ChartCard>
   );

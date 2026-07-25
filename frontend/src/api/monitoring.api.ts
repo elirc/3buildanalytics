@@ -32,10 +32,28 @@ export function getMonitoringSeries(
   return apiClient<Array<{ date: string; value: number; name: string }>>(`/api/monitoring/${path}?${query}`);
 }
 
+export interface QueueDepth {
+  /** Flat fields kept for callers that only want a backlog number. */
+  pending: number;
+  processing: number;
+  failed: number;
+  total: number;
+  /** Counted from ExportJob rows. A proxy — cannot see stuck or delayed jobs. */
+  jobs: { pending: number; processing: number; failed: number; total: number };
+  /** BullMQ's own counts. Null when Redis could not be reached. */
+  queue: {
+    waiting: number;
+    active: number;
+    delayed: number;
+    failed: number;
+    completed: number;
+    paused: number;
+  } | null;
+  redisAvailable: boolean;
+}
+
 export function getQueueDepth() {
-  return apiClient<{ pending: number; processing: number; failed: number; total: number }>(
-    "/api/monitoring/queue-depth"
-  );
+  return apiClient<QueueDepth>("/api/monitoring/queue-depth");
 }
 
 export function getRecentJobFailures(params: DateRangeParams) {
