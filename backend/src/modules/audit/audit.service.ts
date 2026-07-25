@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 
 import { AppError } from "../../shared/errors/AppError.js";
 import { ERROR_CODES } from "../../shared/errors/errorCodes.js";
-import { parseDateRange, toIsoDate } from "../../shared/utils/dates.js";
+import { parseDateRange } from "../../shared/utils/dates.js";
 import { cacheInvalidator } from "../../cache/cacheInvalidator.js";
 import { auditRepository } from "./audit.repository.js";
 
@@ -57,43 +57,17 @@ export const auditService = {
   },
 
   async summaryByAction(input: { startDate: string; endDate: string }) {
-    const data = await this.list({ ...input, pageSize: 10_000 });
-
-    const grouped = data.items.reduce<Record<string, number>>((accumulator, event) => {
-      accumulator[event.action] = (accumulator[event.action] ?? 0) + 1;
-      return accumulator;
-    }, {});
-
-    return Object.entries(grouped)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([action, count]) => ({ action, count }));
+    const range = parseDateRange(input.startDate, input.endDate);
+    return auditRepository.summaryByAction(range.startDate, range.endDate);
   },
 
   async summaryByActor(input: { startDate: string; endDate: string }) {
-    const data = await this.list({ ...input, pageSize: 10_000 });
-
-    const grouped = data.items.reduce<Record<string, number>>((accumulator, event) => {
-      const key = event.actor?.email ?? "unknown";
-      accumulator[key] = (accumulator[key] ?? 0) + 1;
-      return accumulator;
-    }, {});
-
-    return Object.entries(grouped)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([actor, count]) => ({ actor, count }));
+    const range = parseDateRange(input.startDate, input.endDate);
+    return auditRepository.summaryByActor(range.startDate, range.endDate);
   },
 
   async summaryOverTime(input: { startDate: string; endDate: string }) {
-    const data = await this.list({ ...input, pageSize: 10_000 });
-
-    const grouped = data.items.reduce<Record<string, number>>((accumulator, event) => {
-      const key = toIsoDate(event.createdAt);
-      accumulator[key] = (accumulator[key] ?? 0) + 1;
-      return accumulator;
-    }, {});
-
-    return Object.entries(grouped)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([date, count]) => ({ date, count }));
+    const range = parseDateRange(input.startDate, input.endDate);
+    return auditRepository.summaryOverTime(range.startDate, range.endDate);
   }
 };
