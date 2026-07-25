@@ -18,3 +18,6 @@ frontend/test-results/
 
 # Local-only infrastructure overrides (ports differ per machine)
 docker-compose.override.yml
+
+# Local test env (ports differ per machine)
+backend/.env.test
