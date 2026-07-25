@@ -53,8 +53,13 @@ export function createApp() {
   app.use(express.json());
   app.use(cookieParser());
   app.use(requestLoggerMiddleware);
-  app.use(rateLimitMiddleware);
+  // authMiddleware runs BEFORE the limiter now. It is non-blocking — it only
+  // attaches req.user when a valid token is present — so moving it earlier
+  // changes no authorisation behaviour, and it lets the limiter key on the
+  // user instead of the IP. Without that, everyone behind one office NAT
+  // shares a single budget.
   app.use(authMiddleware);
+  app.use(rateLimitMiddleware);
 
   /** Liveness: the process is up and can answer. Deliberately checks nothing else. */
   app.get("/health", (_request, response) => {

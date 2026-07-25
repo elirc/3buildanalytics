@@ -3,13 +3,14 @@ import { Router } from "express";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { requireAuthenticated } from "../../middleware/requireAuthenticated.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
+import { authRateLimit } from "../../middleware/rateLimit.middleware.js";
 import { authController } from "./auth.controller.js";
 import { loginSchema, logoutSchema, refreshSchema, registerSchema } from "./auth.schemas.js";
 
 export const authRouter = Router();
 
-authRouter.post("/register", validate(registerSchema), asyncHandler(authController.register));
-authRouter.post("/login", validate(loginSchema), asyncHandler(authController.login));
+authRouter.post("/register", authRateLimit, validate(registerSchema), asyncHandler(authController.register));
+authRouter.post("/login", authRateLimit, validate(loginSchema), asyncHandler(authController.login));
 authRouter.post("/refresh", validate(refreshSchema), asyncHandler(authController.refresh));
 authRouter.post("/logout", validate(logoutSchema), asyncHandler(authController.logout));
 // Signs the caller out everywhere. Requires an access token rather than a

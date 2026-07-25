@@ -3,12 +3,13 @@ import { Router } from "express";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { requirePermission } from "../../middleware/requirePermission.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
+import { exportRateLimit } from "../../middleware/rateLimit.middleware.js";
 import { exportsController } from "./exports.controller.js";
 import { createExportSchema, estimateExportSchema, exportIdSchema } from "./exports.schemas.js";
 
 export const exportsRouter = Router();
 
-exportsRouter.post("/", requirePermission("exports:create"), validate(createExportSchema), asyncHandler(exportsController.create));
+exportsRouter.post("/", requirePermission("exports:create"), exportRateLimit, validate(createExportSchema), asyncHandler(exportsController.create));
 // Same body as create, but creates nothing — lets the UI warn about a large
 // export before the user commits to it.
 exportsRouter.post("/estimate", requirePermission("exports:create"), validate(estimateExportSchema), asyncHandler(exportsController.estimate));
