@@ -101,6 +101,14 @@ const ROUTES: RouteSpec[] = [
   { method: "patch", path: "/api/dashboard-configs/some-id", permission: "dashboard:configure" },
   { method: "delete", path: "/api/dashboard-configs/some-id", permission: "dashboard:configure" },
 
+  // alerts — reading needs monitoring:view, changing rules needs alerts:manage
+  { method: "get", path: "/api/alerts/rules", permission: "monitoring:view" },
+  { method: "post", path: "/api/alerts/rules", permission: "alerts:manage" },
+  { method: "patch", path: "/api/alerts/rules/some-id", permission: "alerts:manage" },
+  { method: "delete", path: "/api/alerts/rules/some-id", permission: "alerts:manage" },
+  { method: "get", path: "/api/alerts/events", permission: "monitoring:view" },
+  { method: "post", path: "/api/alerts/events/some-id/acknowledge", permission: "monitoring:view" },
+
   // saved views
   { method: "get", path: "/api/saved-views", permission: "views:manage" },
   { method: "post", path: "/api/saved-views", permission: "views:manage" },
@@ -191,6 +199,7 @@ describe("RBAC contract", () => {
 /** Mount prefixes, longest first so "/api/dashboard-configs" wins over "/api/dashboard". */
 const MOUNT_PREFIXES = [
   "/api/dashboard-configs",
+  "/api/alerts",
   "/api/saved-views",
   "/api/audit-events",
   "/api/monitoring",

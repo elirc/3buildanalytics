@@ -1,6 +1,7 @@
 import { registerExportProcessor } from "./jobs/export.processor.js";
 import { registerExportCleanupProcessor } from "./jobs/exportCleanup.processor.js";
 import { registerMetricSnapshotProcessor } from "./jobs/metricSnapshot.processor.js";
+import { registerAlertEvaluationProcessor } from "./jobs/alertEvaluation.processor.js";
 import { getRedisClient } from "./cache/redis.js";
 import { logInfo, logWarn } from "./shared/utils/logger.js";
 
@@ -12,7 +13,8 @@ async function bootstrapWorker() {
     // API instance means N sweeps an hour racing over the same rows.
     await registerExportCleanupProcessor();
     await registerMetricSnapshotProcessor();
-    logInfo("worker.started", { queues: ["exports", "export-cleanup", "metric-snapshots"] });
+    await registerAlertEvaluationProcessor();
+    logInfo("worker.started", { queues: ["exports", "export-cleanup", "metric-snapshots", "alert-evaluation"] });
   } catch (error) {
     logWarn("worker.failed_to_start", {
       error: error instanceof Error ? error.message : "unknown"

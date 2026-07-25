@@ -22,6 +22,7 @@ model User {
   exportJobs   ExportJob[]
   tokens       RefreshToken[]
   savedViews   SavedView[]
+  alertRules   AlertRule[]
 }
 
 /// A named, reusable set of dashboard filters.
@@ -165,6 +166,52 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+/// A threshold on a monitoring metric.
+model AlertRule {
+  id            String               @id @default(uuid())
+  name          String
+  metricType    MonitoringMetricType
+  comparator    AlertComparator
+  threshold     Float
+  /// Averaging window. A single bad sample is noise; a bad average is a signal.
+  windowMinutes Int                  @default(15)
+  isEnabled     Boolean              @default(true)
+  createdById   String
+  createdBy     User                 @relation(fields: [createdById], references: [id])
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  events        AlertEvent[]
+
+  @@index([metricType])
+  @@index([isEnabled])
+}
+
+/// One firing of a rule. Resolved automatically when the metric recovers.
+model AlertEvent {
+  id               String      @id @default(uuid())
+  ruleId           String
+  rule             AlertRule   @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  observedValue    Float
+  status           AlertStatus @default(FIRING)
+  firedAt          DateTime    @default(now())
+  resolvedAt       DateTime?
+  acknowledgedById String?
+
+  @@index([ruleId, status])
+  @@index([firedAt])
+}
+
+enum AlertComparator {
+  GREATER_THAN
+  LESS_THAN
+}
+
+enum AlertStatus {
+  FIRING
+  ACKNOWLEDGED
+  RESOLVED
 }
 
 enum Role {
