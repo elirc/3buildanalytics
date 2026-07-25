@@ -39,6 +39,16 @@ export function EventLogPage() {
         interval={filters.interval}
         onRangeChange={(range) => updateFilters(range)}
         onIntervalChange={(interval) => updateFilters({ interval })}
+        savedViewsPage="events"
+        currentFilters={{
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          eventType: filters.eventType || undefined,
+          pageSize: filters.pageSize,
+          sortBy: filters.sortBy || undefined,
+          sortDir: (filters.sortDir || undefined) as "asc" | "desc" | undefined
+        }}
+        onApplySavedView={(saved) => updateFilters(saved)}
       />
       <Card className="flex justify-end">
         <EventFilters value={filters.eventType} onChange={(value) => updateFilters({ eventType: value })} />

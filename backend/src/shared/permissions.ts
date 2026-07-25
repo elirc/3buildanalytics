@@ -10,7 +10,8 @@ export type Permission =
   | "audit:view"
   | "monitoring:view"
   | "exports:create"
-  | "exports:view";
+  | "exports:view"
+  | "views:manage";
 
 /**
  * The single source of truth for who can do what.
@@ -29,30 +30,34 @@ export const PERMISSIONS: Record<Role, readonly Permission[]> = {
     "audit:view",
     "monitoring:view",
     "exports:create",
-    "exports:view"
+    "exports:view",
+    "views:manage"
   ],
   OPS_MANAGER: [
     "dashboard:view",
     "dashboard:configure",
     "events:view",
     "exports:create",
-    "exports:view"
+    "exports:view",
+    "views:manage"
   ],
   PRODUCT_MANAGER: [
     "dashboard:view",
     "dashboard:configure",
     "events:view",
     "exports:create",
-    "exports:view"
+    "exports:view",
+    "views:manage"
   ],
   ENGINEERING_ADMIN: [
     "dashboard:view",
     "dashboard:configure",
     "monitoring:view",
     "exports:create",
-    "exports:view"
+    "exports:view",
+    "views:manage"
   ],
-  AUDIT_VIEWER: ["dashboard:view", "audit:view", "exports:create", "exports:view"],
+  AUDIT_VIEWER: ["dashboard:view", "audit:view", "exports:create", "exports:view", "views:manage"],
   EXECUTIVE_VIEWER: ["dashboard:view"],
   READ_ONLY: ["dashboard:view"]
 };

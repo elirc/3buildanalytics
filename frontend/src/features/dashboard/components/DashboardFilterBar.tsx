@@ -1,5 +1,7 @@
+import type { SavedViewFilters, SavedViewPage } from "../../../api/savedViews.api";
 import { Card } from "../../../components/ui/card";
 import { DateRangePicker } from "./DateRangePicker";
+import { SavedViewsMenu } from "./SavedViewsMenu";
 
 export function DashboardFilterBar(props: {
   startDate: string;
@@ -7,6 +9,13 @@ export function DashboardFilterBar(props: {
   interval: string;
   onRangeChange: (filters: { startDate: string; endDate: string }) => void;
   onIntervalChange: (interval: string) => void;
+  /**
+   * Which page's saved views to offer. Omit to hide the saved-views control —
+   * useful for surfaces where a saved filter set makes no sense.
+   */
+  savedViewsPage?: SavedViewPage;
+  currentFilters?: SavedViewFilters;
+  onApplySavedView?: (filters: SavedViewFilters) => void;
 }) {
   return (
     <Card className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -15,6 +24,13 @@ export function DashboardFilterBar(props: {
         <h2 className="mt-1 text-lg font-semibold">Date range and chart granularity</h2>
       </div>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        {props.savedViewsPage && props.onApplySavedView ? (
+          <SavedViewsMenu
+            page={props.savedViewsPage}
+            currentFilters={props.currentFilters ?? {}}
+            onApply={props.onApplySavedView}
+          />
+        ) : null}
         <DateRangePicker startDate={props.startDate} endDate={props.endDate} onChange={props.onRangeChange} />
         <select
           value={props.interval}

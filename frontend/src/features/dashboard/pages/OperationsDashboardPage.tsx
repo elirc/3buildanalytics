@@ -41,6 +41,15 @@ export function OperationsDashboardPage() {
         interval={filters.interval}
         onRangeChange={(range) => updateFilters(range)}
         onIntervalChange={(interval) => updateFilters({ interval })}
+        savedViewsPage="operations"
+        currentFilters={{
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          interval: filters.interval as "day" | "week"
+        }}
+        // Applying a view just writes its filters into the URL; everything on
+        // the page already reacts to that.
+        onApplySavedView={(saved) => updateFilters(saved)}
       />
 
       {/* Each card owns its own loading/error/empty state, so one failing
