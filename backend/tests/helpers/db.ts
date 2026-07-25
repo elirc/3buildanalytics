@@ -1,3 +1,4 @@
+import { getRedisClient } from "../../src/cache/redis.js";
 import { prisma } from "../../src/db/prisma.js";
 
 /**
@@ -29,6 +30,31 @@ const TABLES = [
 export async function resetDatabase() {
   const list = TABLES.map((table) => `"${table}"`).join(", ");
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE;`);
+  await resetCache();
+}
+
+/**
+ * Clears the Redis cache between tests.
+ *
+ * Truncating tables is not enough: cached responses survive, and cache keys are
+ * built from role + date range, so two tests using the same range and role see
+ * each other's results.
+ *
+ * This was found the hard way. Locally there is no Redis, so cacheService
+ * always missed and the suite passed; CI *does* run Redis, so two
+ * metric-snapshot tests read a cached "snapshot" response from an earlier test
+ * and failed asserting "live". A difference between the local and CI
+ * environments was hiding a genuine state leak — which is a good argument for
+ * CI running the real dependencies.
+ *
+ * Failure is ignored: the suite must still run without Redis.
+ */
+export async function resetCache() {
+  try {
+    await getRedisClient().flushdb();
+  } catch {
+    // No Redis available — nothing cached, nothing to clear.
+  }
 }
 
 export async function disconnectDatabase() {
