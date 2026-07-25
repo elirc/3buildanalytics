@@ -51,7 +51,7 @@ const ROUTES: RouteSpec[] = [
   { method: "patch", path: "/api/users/some-id", permission: "users:manage" },
 
   // events
-  { method: "post", path: "/api/events/track", permission: "events:view" },
+  { method: "post", path: "/api/events/track", permission: "events:write" },
   { method: "get", path: "/api/events", permission: "events:view" },
   { method: "get", path: "/api/events/summary/by-type", permission: "events:view" },
   { method: "get", path: "/api/events/summary/over-time", permission: "events:view" },
@@ -74,7 +74,7 @@ const ROUTES: RouteSpec[] = [
   { method: "get", path: "/api/dashboard/recent-activity", permission: "dashboard:view" },
 
   // monitoring
-  { method: "post", path: "/api/monitoring/metrics", permission: "monitoring:view" },
+  { method: "post", path: "/api/monitoring/metrics", permission: "monitoring:write" },
   { method: "get", path: "/api/monitoring/summary", permission: "monitoring:view" },
   { method: "get", path: "/api/monitoring/api-latency", permission: "monitoring:view" },
   { method: "get", path: "/api/monitoring/error-rate", permission: "monitoring:view" },

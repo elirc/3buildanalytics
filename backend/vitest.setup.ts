@@ -45,6 +45,11 @@ process.env.EXPORT_STORAGE_DIR = process.env.EXPORT_STORAGE_DIR ?? "storage/expo
 // of why a process-local limiter is the wrong design â€” see US-18.
 process.env.RATE_LIMIT_MAX_REQUESTS = process.env.RATE_LIMIT_MAX_REQUESTS ?? "1000000";
 
+// Off by default in tests. The collector writes MonitoringMetric rows, and
+// several suites assert on the contents of that table — a suite that
+// instruments itself would be asserting against its own exhaust.
+process.env.METRICS_ENABLED = process.env.METRICS_ENABLED ?? "false";
+
 if (!/analytics_admin_test/.test(process.env.DATABASE_URL)) {
   throw new Error(
     `Refusing to run tests against "${process.env.DATABASE_URL}". ` +

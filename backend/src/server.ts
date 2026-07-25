@@ -4,6 +4,7 @@ import { env } from "./config/env.js";
 import { prisma } from "./db/prisma.js";
 import { getRedisClient } from "./cache/redis.js";
 import { logInfo, logWarn } from "./shared/utils/logger.js";
+import { metricsCollector } from "./shared/metrics/collector.js";
 
 async function bootstrap() {
   await prisma.$connect();
@@ -16,6 +17,8 @@ async function bootstrap() {
       error: error instanceof Error ? error.message : "unknown"
     });
   }
+
+  metricsCollector.start();
 
   const app = createApp();
   app.listen(env.BACKEND_PORT, () => {

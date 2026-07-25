@@ -8,7 +8,8 @@ import { monitoringRangeSchema, recordMetricSchema } from "./monitoring.schemas.
 
 export const monitoringRouter = Router();
 
-monitoringRouter.post("/metrics", requirePermission("monitoring:view"), validate(recordMetricSchema), asyncHandler(monitoringController.record));
+// Recording a metric is a write; reading the dashboard is not.
+monitoringRouter.post("/metrics", requirePermission("monitoring:write"), validate(recordMetricSchema), asyncHandler(monitoringController.record));
 monitoringRouter.get("/summary", requirePermission("monitoring:view"), validate(monitoringRangeSchema), asyncHandler(monitoringController.summary));
 monitoringRouter.get("/api-latency", requirePermission("monitoring:view"), validate(monitoringRangeSchema), asyncHandler(monitoringController.apiLatency));
 monitoringRouter.get("/error-rate", requirePermission("monitoring:view"), validate(monitoringRangeSchema), asyncHandler(monitoringController.errorRate));

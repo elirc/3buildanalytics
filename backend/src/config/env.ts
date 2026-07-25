@@ -20,7 +20,14 @@ const envSchema = z.object({
   // system produces — keeping them forever is a liability, not a feature.
   EXPORT_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
-  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(250)
+  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(250),
+  // Off in tests: a suite that writes metric rows pollutes the very tables
+  // other tests assert on.
+  METRICS_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  METRICS_RETENTION_DAYS: z.coerce.number().int().positive().default(30)
 });
 
 export const env = envSchema.parse(process.env);
