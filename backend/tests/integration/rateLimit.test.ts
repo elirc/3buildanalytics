@@ -19,12 +19,46 @@ import { disconnectDatabase, resetDatabase } from "../helpers/db.js";
  */
 let redisAvailable = false;
 
+/**
+ * Establish the connection before probing it.
+ *
+ * The cache client is built with lazyConnect and enableOfflineQueue: false
+ * (US-20), so the very first command is rejected outright while the socket is
+ * still being established. A bare ping() therefore reported "no Redis" on a
+ * perfectly healthy CI runner — and because the enforcement tests skip when
+ * that flag is false, all six of them silently did nothing while appearing
+ * green. Tests that skip quietly are worse than tests that fail: they report
+ * success for work they never performed.
+ */
 beforeAll(async () => {
+  const client = getRedisClient();
+
   try {
-    await getRedisClient().ping();
-    redisAvailable = true;
+    if (client.status !== "ready") {
+      await client.connect().catch(() => undefined);
+    }
+
+    // A couple of attempts, because "connecting" is a normal transient state.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await client.ping();
+        redisAvailable = true;
+        break;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
   } catch {
     redisAvailable = false;
+  }
+});
+
+/** Guards against the skip-everything failure mode described above. */
+it("knows whether Redis is available", () => {
+  // In CI this must be true: the workflow runs a redis service, and a suite
+  // that skips its own subject is not a passing suite.
+  if (process.env.CI) {
+    expect(redisAvailable).toBe(true);
   }
 });
 
