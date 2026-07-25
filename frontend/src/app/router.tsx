@@ -2,7 +2,7 @@ import { Suspense, lazy } from "react";
 import { createBrowserRouter } from "react-router-dom";
 
 import { RequireAuth } from "../auth/RequireAuth";
-import { RequireRole } from "../auth/RequireRole";
+import { RequirePermission } from "../auth/RequirePermission";
 import { LoginPage } from "../auth/LoginPage";
 import { AppLayout } from "../layout/AppLayout";
 import { LoadingState } from "../components/LoadingState";
@@ -33,30 +33,41 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { path: "/", element: withSuspense(<OperationsDashboardPage />) },
-          { path: "/product", element: withSuspense(<ProductDashboardPage />) },
-          { path: "/engineering", element: withSuspense(<EngineeringDashboardPage />) },
-          { path: "/executive", element: withSuspense(<ExecutiveDashboardPage />) },
-          { path: "/exports", element: withSuspense(<ExportCenterPage />) },
+          // Guarded by permission, never by a role list. Each permission below
+          // is the one the API enforces on the endpoints that page calls, so
+          // the router and the server cannot disagree about who gets in.
           {
-            element: <RequireRole roles={["SYSTEM_ADMIN", "OPS_MANAGER", "PRODUCT_MANAGER"]} />,
+            element: <RequirePermission permission="dashboard:view" />,
+            children: [
+              { path: "/", element: withSuspense(<OperationsDashboardPage />) },
+              { path: "/product", element: withSuspense(<ProductDashboardPage />) },
+              { path: "/executive", element: withSuspense(<ExecutiveDashboardPage />) }
+            ]
+          },
+          {
+            element: <RequirePermission permission="monitoring:view" />,
+            children: [
+              { path: "/engineering", element: withSuspense(<EngineeringDashboardPage />) },
+              { path: "/monitoring", element: withSuspense(<MonitoringDashboardPage />) }
+            ]
+          },
+          {
+            element: <RequirePermission permission="exports:view" />,
+            children: [{ path: "/exports", element: withSuspense(<ExportCenterPage />) }]
+          },
+          {
+            element: <RequirePermission permission="events:view" />,
             children: [
               { path: "/events", element: withSuspense(<EventLogPage />) },
               { path: "/events/:id", element: withSuspense(<EventDetailPage />) }
             ]
           },
           {
-            element: <RequireRole roles={["SYSTEM_ADMIN", "AUDIT_VIEWER"]} />,
+            element: <RequirePermission permission="audit:view" />,
             children: [{ path: "/audit", element: withSuspense(<AuditDashboardPage />) }]
           },
           {
-            element: <RequireRole roles={["SYSTEM_ADMIN", "ENGINEERING_ADMIN"]} />,
-            children: [
-              { path: "/monitoring", element: withSuspense(<MonitoringDashboardPage />) }
-            ]
-          },
-          {
-            element: <RequireRole roles={["SYSTEM_ADMIN", "OPS_MANAGER", "PRODUCT_MANAGER", "ENGINEERING_ADMIN", "AUDIT_VIEWER"]} />,
+            element: <RequirePermission permission="dashboard:configure" />,
             children: [{ path: "/dashboard-configs", element: withSuspense(<DashboardConfigPage />) }]
           }
         ]

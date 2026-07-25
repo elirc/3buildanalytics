@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import type { Permission } from "../lib/permissions";
+
 export type Role =
   | "SYSTEM_ADMIN"
   | "OPS_MANAGER"
@@ -16,6 +18,13 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   role: Role;
+  /**
+   * Issued by the server with the session. Optional because a session persisted
+   * to localStorage before this field existed will not have it — the permission
+   * helpers fall back to the local matrix in that case rather than locking the
+   * user out of their own navigation.
+   */
+  permissions?: readonly Permission[];
 }
 
 interface AuthState {
