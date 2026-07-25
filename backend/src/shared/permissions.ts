@@ -1,4 +1,6 @@
-import { Role } from "@prisma/client";
+// Type-only import: this module must stay free of runtime dependencies so the
+// frontend's drift test can import it directly without pulling in Prisma.
+import type { Role } from "@prisma/client";
 
 export type Permission =
   | "users:manage"
@@ -10,7 +12,15 @@ export type Permission =
   | "exports:create"
   | "exports:view";
 
-const permissionMatrix: Record<Role, Permission[]> = {
+/**
+ * The single source of truth for who can do what.
+ *
+ * Exported (it used to be module-private) so that the API can report a role's
+ * permissions to the client, and so tests can assert against it directly.
+ * Nothing may hard-code a role list to make an access decision — derive it from
+ * here instead, or the three copies of the rules drift apart again.
+ */
+export const PERMISSIONS: Record<Role, readonly Permission[]> = {
   SYSTEM_ADMIN: [
     "users:manage",
     "dashboard:view",
@@ -48,7 +58,12 @@ const permissionMatrix: Record<Role, Permission[]> = {
 };
 
 export function hasPermission(role: Role, permission: Permission) {
-  return permissionMatrix[role].includes(permission);
+  return PERMISSIONS[role].includes(permission);
+}
+
+/** Returned to the client so the UI can hide what the API would refuse. */
+export function getPermissionsForRole(role: Role): Permission[] {
+  return [...PERMISSIONS[role]];
 }
 
 export function applyMetricVisibility<T extends Record<string, unknown>>(role: Role, metrics: T) {
