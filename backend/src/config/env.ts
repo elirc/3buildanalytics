@@ -15,6 +15,10 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
   EXPORT_STORAGE_DIR: z.string().default("storage/exports"),
+  // How long a completed export stays downloadable. Exports contain whatever
+  // the requester could see, so they are the most PII-dense artifacts the
+  // system produces — keeping them forever is a liability, not a feature.
+  EXPORT_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(250)
 });
