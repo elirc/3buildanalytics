@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import express from "express";
 import request from "supertest";
 
@@ -54,7 +56,7 @@ describe("rate limiting", () => {
   it("allows requests up to the limit and rejects the next one", async () => {
     if (!redisAvailable) return;
 
-    const app = appWith({ points: 3, windowMs: 60_000, bucket: `t-${Date.now()}-a` });
+    const app = appWith({ points: 3, windowMs: 60_000, bucket: `t-${randomUUID()}` });
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const allowed = await request(app).get("/probe");
@@ -72,7 +74,7 @@ describe("rate limiting", () => {
   it("reports remaining budget in the headers", async () => {
     if (!redisAvailable) return;
 
-    const app = appWith({ points: 5, windowMs: 60_000, bucket: `t-${Date.now()}-b` });
+    const app = appWith({ points: 5, windowMs: 60_000, bucket: `t-${randomUUID()}` });
 
     const first = await request(app).get("/probe");
     expect(first.headers["x-ratelimit-limit"]).toBe("5");
@@ -89,7 +91,7 @@ describe("rate limiting", () => {
   it("gives authenticated users independent budgets", async () => {
     if (!redisAvailable) return;
 
-    const bucket = `t-${Date.now()}-c`;
+    const bucket = `t-${randomUUID()}`;
     const alice = appWith({ points: 2, windowMs: 60_000, bucket }, { id: "alice" });
     const bob = appWith({ points: 2, windowMs: 60_000, bucket }, { id: "bob" });
 
@@ -104,7 +106,7 @@ describe("rate limiting", () => {
   it("keys on IP when told to, even for an authenticated caller", async () => {
     if (!redisAvailable) return;
 
-    const bucket = `t-${Date.now()}-d`;
+    const bucket = `t-${randomUUID()}`;
     const alice = appWith(
       { points: 1, windowMs: 60_000, bucket, keyByIpOnly: true },
       { id: "alice" }
@@ -120,9 +122,11 @@ describe("rate limiting", () => {
   it("keeps separate buckets separate", async () => {
     if (!redisAvailable) return;
 
-    const suffix = Date.now();
-    const one = appWith({ points: 1, windowMs: 60_000, bucket: `t-${suffix}-e1` });
-    const two = appWith({ points: 1, windowMs: 60_000, bucket: `t-${suffix}-e2` });
+    const bucketOne = `t-${randomUUID()}`;
+    const bucketTwo = `t-${randomUUID()}`;
+
+    const one = appWith({ points: 1, windowMs: 60_000, bucket: bucketOne });
+    const two = appWith({ points: 1, windowMs: 60_000, bucket: bucketTwo });
 
     expect((await request(one).get("/probe")).status).toBe(200);
     expect((await request(one).get("/probe")).status).toBe(429);
@@ -134,7 +138,7 @@ describe("rate limiting", () => {
     if (!redisAvailable) return;
 
     // A 1ms window is already over by the time the second request arrives.
-    const app = appWith({ points: 1, windowMs: 1, bucket: `t-${Date.now()}-f` });
+    const app = appWith({ points: 1, windowMs: 1, bucket: `t-${randomUUID()}` });
 
     expect((await request(app).get("/probe")).status).toBe(200);
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -148,23 +152,22 @@ describe("rate limiting when Redis is unavailable", () => {
    * own dependency is down turns a Redis outage into a full outage.
    */
   it("fails open rather than rejecting traffic", async () => {
+    // Only meaningful without Redis. With Redis the limiter enforces, which
+    // the first test in this file already proves — asserting it again here
+    // added nothing and made the test depend on cross-test bucket state.
+    if (redisAvailable) {
+      return;
+    }
+
     const app = appWith({
       points: 1,
       windowMs: 60_000,
-      bucket: `t-${Date.now()}-g`
+      bucket: `t-${randomUUID()}`
     });
 
-    const first = await request(app).get("/probe");
-    const second = await request(app).get("/probe");
-
-    if (redisAvailable) {
-      // With Redis present the limit is genuinely enforced.
-      expect(first.status).toBe(200);
-      expect(second.status).toBe(429);
-    } else {
-      // Without it, both are served.
-      expect(first.status).toBe(200);
-      expect(second.status).toBe(200);
-    }
+    // Both served despite points: 1, because the limiter cannot reach Redis
+    // and chooses availability over enforcement.
+    expect((await request(app).get("/probe")).status).toBe(200);
+    expect((await request(app).get("/probe")).status).toBe(200);
   });
 });
