@@ -9,7 +9,9 @@ const dateRangeQuery = z.object({
   actorId: z.string().optional(),
   entityType: z.string().optional(),
   entityId: z.string().optional(),
-  search: z.string().optional()
+  search: z.string().optional(),
+  sortBy: z.string().optional(),
+  sortDir: z.enum(["asc", "desc"]).optional()
 });
 
 export const trackEventSchema = z.object({

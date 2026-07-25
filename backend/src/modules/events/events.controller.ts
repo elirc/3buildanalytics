@@ -21,7 +21,9 @@ export const eventsController = {
       entityId: request.query.entityId ? String(request.query.entityId) : undefined,
       search: request.query.search ? String(request.query.search) : undefined,
       page: request.query.page ? Number(request.query.page) : undefined,
-      pageSize: request.query.pageSize ? Number(request.query.pageSize) : undefined
+      pageSize: request.query.pageSize ? Number(request.query.pageSize) : undefined,
+      sortBy: request.query.sortBy ? String(request.query.sortBy) : undefined,
+      sortDir: request.query.sortDir ? String(request.query.sortDir) : undefined
     });
 
     response.status(200).json(result);
