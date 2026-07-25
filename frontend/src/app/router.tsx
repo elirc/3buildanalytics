@@ -16,6 +16,7 @@ const EventLogPage = lazy(() => import("../features/events/pages/EventLogPage").
 const EventDetailPage = lazy(() => import("../features/events/pages/EventDetailPage").then((module) => ({ default: module.EventDetailPage })));
 const MonitoringDashboardPage = lazy(() => import("../features/monitoring/pages/MonitoringDashboardPage").then((module) => ({ default: module.MonitoringDashboardPage })));
 const ExportCenterPage = lazy(() => import("../features/exports/pages/ExportCenterPage").then((module) => ({ default: module.ExportCenterPage })));
+const UsersPage = lazy(() => import("../features/users/pages/UsersPage").then((module) => ({ default: module.UsersPage })));
 const DashboardConfigPage = lazy(() => import("../features/dashboardConfigs/pages/DashboardConfigPage").then((module) => ({ default: module.DashboardConfigPage })));
 
 function withSuspense(element: React.ReactNode) {
@@ -65,6 +66,10 @@ export const router = createBrowserRouter([
           {
             element: <RequirePermission permission="audit:view" />,
             children: [{ path: "/audit", element: withSuspense(<AuditDashboardPage />) }]
+          },
+          {
+            element: <RequirePermission permission="users:manage" />,
+            children: [{ path: "/users", element: withSuspense(<UsersPage />) }]
           },
           {
             element: <RequirePermission permission="dashboard:configure" />,
