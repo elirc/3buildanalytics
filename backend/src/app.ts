@@ -17,6 +17,7 @@ import { monitoringRouter } from "./modules/monitoring/monitoring.routes.js";
 import { exportsRouter } from "./modules/exports/exports.routes.js";
 import { dashboardConfigsRouter } from "./modules/dashboardConfigs/dashboardConfigs.routes.js";
 import { savedViewsRouter } from "./modules/savedViews/savedViews.routes.js";
+import { alertsRouter } from "./modules/alerts/alerts.routes.js";
 
 export function createApp() {
   const app = express();
@@ -52,6 +53,7 @@ export function createApp() {
   app.use("/api/exports", exportsRouter);
   app.use("/api/dashboard-configs", dashboardConfigsRouter);
   app.use("/api/saved-views", savedViewsRouter);
+  app.use("/api/alerts", alertsRouter);
 
   app.use(errorMiddleware);
 
