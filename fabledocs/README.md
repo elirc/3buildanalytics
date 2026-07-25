@@ -7,6 +7,7 @@ engineer who is about to make their first changes to this repo.
 | --- | --- | --- |
 | [`01-app-overview.md`](01-app-overview.md) | What the product does, how the code is organised, how a request flows end to end, and the honest list of gaps | Before you touch anything |
 | [`02-user-stories.md`](02-user-stories.md) | 20 implementation-ready user stories (US-01 … US-20) with acceptance criteria, file lists, and test requirements | When you pick up your first ticket |
+| [`03-git-workflow.md`](03-git-workflow.md) | The branch, commit, and PR conventions this repo models — with PR #1 as a worked example — plus current backlog status | Before you open your first PR |
 
 ## How to use this pack
 
