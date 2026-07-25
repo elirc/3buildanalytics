@@ -57,6 +57,11 @@ export function EngineeringDashboardPage() {
             <KpiCard
               label="Queue backlog"
               value={String(queueDepthQuery.data?.total ?? summary.queueDepth.total)}
+              detail={
+                queueDepthQuery.data && !queueDepthQuery.data.redisAvailable
+                  ? "Redis unreachable — database count only"
+                  : undefined
+              }
             />
           </div>
         )}
