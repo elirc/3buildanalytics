@@ -120,22 +120,54 @@ export const authService = {
   },
 
   async refresh(refreshToken: string) {
-    const payload = verifyRefreshToken(refreshToken);
+    // Any verification failure — malformed, wrong signature, expired — is a
+    // client error, so it becomes a 401. Previously jsonwebtoken's
+    // JsonWebTokenError escaped as-is; it is not an AppError, so the error
+    // middleware fell through to its catch-all and returned 500. Garbage from a
+    // client is not a server fault.
+    //
+    // All three cases give the same answer on purpose, so the endpoint does not
+    // reveal which kind of invalid a token was.
+    let payload;
+    try {
+      payload = verifyRefreshToken(refreshToken);
+    } catch {
+      throw new AppError(ERROR_CODES.UNAUTHORIZED, "Refresh token is invalid or expired", 401);
+    }
+
     const tokenHash = sha256(refreshToken);
 
+    // Look the token up regardless of its revoked state: finding a *revoked*
+    // token is the signal we care about most.
     const storedToken = await prisma.refreshToken.findFirst({
-      where: {
-        userId: payload.sub,
-        tokenHash,
-        revokedAt: null,
-        expiresAt: { gt: new Date() }
-      },
-      include: {
-        user: true
-      }
+      where: { userId: payload.sub, tokenHash },
+      include: { user: true }
     });
 
     if (!storedToken) {
+      throw new AppError(ERROR_CODES.UNAUTHORIZED, "Refresh token is invalid or expired", 401);
+    }
+
+    if (storedToken.revokedAt !== null) {
+      // Reuse detection. A correctly behaving client never presents a token it
+      // has already exchanged, so this means the token was captured and is
+      // being replayed — either by an attacker or by the legitimate user after
+      // an attacker got there first. We cannot tell which, so we end every
+      // session for the account and make them all sign in again.
+      await this.revokeAllForUser(storedToken.userId);
+
+      await auditService.record({
+        actorId: storedToken.userId,
+        action: "REFRESH_TOKEN_REUSE_DETECTED",
+        entityType: "RefreshToken",
+        entityId: storedToken.id,
+        metadata: { revokedAt: storedToken.revokedAt.toISOString() }
+      });
+
+      throw new AppError(ERROR_CODES.UNAUTHORIZED, "Refresh token is invalid or expired", 401);
+    }
+
+    if (storedToken.expiresAt <= new Date()) {
       throw new AppError(ERROR_CODES.UNAUTHORIZED, "Refresh token is invalid or expired", 401);
     }
 
@@ -159,6 +191,16 @@ export const authService = {
         revokedAt: new Date()
       }
     });
+  },
+
+  /** Ends every session for a user. Used by logout-all and by reuse detection. */
+  async revokeAllForUser(userId: string) {
+    const result = await prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() }
+    });
+
+    return result.count;
   }
 };
 

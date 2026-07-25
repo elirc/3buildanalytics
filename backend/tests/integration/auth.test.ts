@@ -69,23 +69,22 @@ describe("auth", () => {
     expect(stored.filter((token) => token.revokedAt === null)).toHaveLength(1);
   });
 
-  /**
-   * KNOWN BUG — deferred to US-04.
-   *
-   * signRefreshToken() signs { sub, email, role } with no nonce. A JWT's `iat`
-   * claim has one-second resolution, so two tokens minted for the same user
-   * inside the same second are byte-identical, and therefore hash-identical.
-   *
-   * Rotation then fails to protect anything: refresh() revokes the row matching
-   * the presented hash and immediately inserts a new row with the *same* hash.
-   * Replaying the supposedly-revoked token finds the new, unrevoked row and
-   * succeeds.
-   *
-   * Fix (US-04): add a random `jti` to the refresh payload so every token is
-   * unique, then add reuse detection that revokes the whole family. Un-skip
-   * this test as part of that story.
-   */
-  it.skip("rejects a replayed refresh token (blocked on US-04: tokens collide within one second)", async () => {
+  it("mints a distinct refresh token every time, even within the same second", async () => {
+    const user = await createUser({ role: "OPS_MANAGER" });
+
+    const first = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: TEST_PASSWORD });
+    const second = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: TEST_PASSWORD });
+
+    // Without a jti these are byte-identical when both land in the same second,
+    // because iat has one-second resolution and nothing else in the payload varies.
+    expect(first.body.refreshToken).not.toBe(second.body.refreshToken);
+  });
+
+  it("rejects a replayed refresh token", async () => {
     const user = await createUser({ role: "OPS_MANAGER" });
     const login = await request(app)
       .post("/api/auth/login")
@@ -97,6 +96,57 @@ describe("auth", () => {
       .post("/api/auth/refresh")
       .send({ refreshToken: login.body.refreshToken });
 
+    expect(replay.status).toBe(401);
+  });
+
+  it("revokes the whole token family when a used token is replayed", async () => {
+    const user = await createUser({ role: "OPS_MANAGER" });
+    const login = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: TEST_PASSWORD });
+
+    const rotated = await request(app)
+      .post("/api/auth/refresh")
+      .send({ refreshToken: login.body.refreshToken });
+
+    // Replay the old token: we cannot tell an attacker from the victim, so
+    // every session for the account ends.
+    await request(app).post("/api/auth/refresh").send({ refreshToken: login.body.refreshToken });
+
+    const stillValid = await request(app)
+      .post("/api/auth/refresh")
+      .send({ refreshToken: rotated.body.refreshToken });
+
+    expect(stillValid.status).toBe(401);
+
+    const active = await prisma.refreshToken.count({
+      where: { userId: user.id, revokedAt: null }
+    });
+    expect(active).toBe(0);
+
+    const audit = await prisma.auditEvent.findFirst({
+      where: { action: "REFRESH_TOKEN_REUSE_DETECTED", actorId: user.id }
+    });
+    expect(audit).not.toBeNull();
+  });
+
+  it("signs the caller out of every session via logout-all", async () => {
+    const user = await createUser({ role: "OPS_MANAGER" });
+    const first = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: TEST_PASSWORD });
+    await request(app).post("/api/auth/login").send({ email: user.email, password: TEST_PASSWORD });
+
+    const response = await request(app)
+      .post("/api/auth/logout-all")
+      .set("Authorization", `Bearer ${first.body.accessToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.revoked).toBe(2);
+
+    const replay = await request(app)
+      .post("/api/auth/refresh")
+      .send({ refreshToken: first.body.refreshToken });
     expect(replay.status).toBe(401);
   });
 
@@ -152,35 +202,35 @@ describe("auth", () => {
     expect(response.body.error.code).toBe("FORBIDDEN");
   });
 
-  /**
-   * KNOWN BUG — deferred to US-04.
-   *
-   * authService.refresh() calls verifyRefreshToken() first. For a malformed
-   * token jsonwebtoken throws JsonWebTokenError, which is not an AppError, so
-   * errorMiddleware falls through to its catch-all and returns 500.
-   *
-   * A garbage token from a client is a client error, not a server error. It
-   * should be 401 UNAUTHORIZED — the same answer an expired or revoked token
-   * gets, so the endpoint does not leak which kind of invalid it was.
-   *
-   * Fix (US-04): wrap the verify call and translate any verification failure
-   * into AppError(UNAUTHORIZED, 401). Un-skip this test as part of that story.
-   */
-  it.skip("returns 401 for a malformed refresh token (blocked on US-04: currently 500)", async () => {
+  it("returns 401 for a malformed refresh token", async () => {
     const response = await request(app)
       .post("/api/auth/refresh")
       .send({ refreshToken: "made-up-token" });
 
     expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe("UNAUTHORIZED");
   });
 
-  it("currently returns 500 for a malformed refresh token (documents the US-04 gap)", async () => {
-    const response = await request(app)
-      .post("/api/auth/refresh")
-      .send({ refreshToken: "made-up-token" });
+  it("gives the same answer for every flavour of invalid token", async () => {
+    const user = await createUser({ role: "OPS_MANAGER" });
+    const login = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: TEST_PASSWORD });
+    await request(app).post("/api/auth/logout").send({ refreshToken: login.body.refreshToken });
 
-    // Pinned deliberately: when US-04 fixes the handler this assertion breaks,
-    // which is the prompt to delete this test and un-skip the one above.
-    expect(response.status).toBe(500);
+    // Must clear refreshSchema's min(10): a shorter string is rejected as a
+    // malformed *request* (400) before the handler ever sees it, which is a
+    // different — and correct — answer.
+    const malformed = await request(app)
+      .post("/api/auth/refresh")
+      .send({ refreshToken: "not-a-valid-token-at-all" });
+    const revoked = await request(app)
+      .post("/api/auth/refresh")
+      .send({ refreshToken: login.body.refreshToken });
+
+    // Identical responses, so the endpoint does not reveal which kind of
+    // invalid a token was.
+    expect(malformed.status).toBe(revoked.status);
+    expect(malformed.body.error.message).toBe(revoked.body.error.message);
   });
 });
