@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getMonitoringSeries, getMonitoringSummary, getQueueDepth, getRecentJobFailures } from "../../../api/monitoring.api";
-import { ErrorState } from "../../../components/ErrorState";
-import { LoadingState } from "../../../components/LoadingState";
 import { DataTable } from "../../../components/DataTable";
+import { QueryBoundary } from "../../../components/QueryBoundary";
 import { ChartCard } from "../components/ChartCard";
 import { DashboardFilterBar } from "../components/DashboardFilterBar";
 import { KpiCard } from "../components/KpiCard";
@@ -39,14 +38,6 @@ export function EngineeringDashboardPage() {
     queryFn: () => getRecentJobFailures({ startDate: filters.startDate, endDate: filters.endDate })
   });
 
-  if (summaryQuery.isLoading) {
-    return <LoadingState label="Loading engineering metrics..." />;
-  }
-
-  if (summaryQuery.isError || !summaryQuery.data) {
-    return <ErrorState message={summaryQuery.error?.message ?? "Failed to load monitoring summary"} />;
-  }
-
   return (
     <div className="space-y-6">
       <DashboardFilterBar
@@ -56,47 +47,68 @@ export function EngineeringDashboardPage() {
         onRangeChange={(range) => updateFilters(range)}
         onIntervalChange={(interval) => updateFilters({ interval })}
       />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Avg API latency" value={`${summaryQuery.data.averageApiLatencyMs} ms`} />
-        <KpiCard label="Avg DB query time" value={`${summaryQuery.data.averageDbQueryTimeMs} ms`} />
-        <KpiCard label="Avg error rate" value={`${(summaryQuery.data.averageErrorRate * 100).toFixed(2)}%`} />
-        <KpiCard label="Queue backlog" value={String(queueDepthQuery.data?.total ?? summaryQuery.data.queueDepth.total)} />
-      </div>
+
+      <QueryBoundary query={summaryQuery} loadingLabel="Loading engineering metrics..." isEmpty={() => false}>
+        {(summary) => (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <KpiCard label="Avg API latency" value={`${summary.averageApiLatencyMs} ms`} />
+            <KpiCard label="Avg DB query time" value={`${summary.averageDbQueryTimeMs} ms`} />
+            <KpiCard label="Avg error rate" value={`${(summary.averageErrorRate * 100).toFixed(2)}%`} />
+            <KpiCard
+              label="Queue backlog"
+              value={String(queueDepthQuery.data?.total ?? summary.queueDepth.total)}
+            />
+          </div>
+        )}
+      </QueryBoundary>
+
       <div className="grid gap-6 xl:grid-cols-2">
         <ChartCard title="API latency" description="Time-series monitoring feed for API responsiveness.">
-          {apiLatencyQuery.data ? <MetricSeriesChart data={apiLatencyQuery.data} /> : <LoadingState label="Loading latency..." />}
+          <QueryBoundary query={apiLatencyQuery} loadingLabel="Loading latency...">
+            {(data) => <MetricSeriesChart data={data} />}
+          </QueryBoundary>
         </ChartCard>
         <ChartCard title="DB query time" description="Database timing trend for engineering support workflows.">
-          {dbQueryTimeQuery.data ? <MetricSeriesChart data={dbQueryTimeQuery.data} color="#d97904" /> : <LoadingState label="Loading DB timings..." />}
+          <QueryBoundary query={dbQueryTimeQuery} loadingLabel="Loading DB timings...">
+            {(data) => <MetricSeriesChart data={data} color="#d97904" />}
+          </QueryBoundary>
         </ChartCard>
       </div>
+
       <ChartCard title="Error rate over time" description="Monitoring metrics are ingested separately from tracked events.">
-        {errorRateQuery.data ? <MetricSeriesChart data={errorRateQuery.data} color="#b73c20" /> : <LoadingState label="Loading error-rate series..." />}
+        <QueryBoundary query={errorRateQuery} loadingLabel="Loading error-rate series...">
+          {(data) => <MetricSeriesChart data={data} color="#b73c20" />}
+        </QueryBoundary>
       </ChartCard>
+
       <ChartCard title="Recent job failures" description="Background job failures are recorded as tracked events for support teams.">
-        {jobFailuresQuery.data ? (
-          <DataTable
-            rows={jobFailuresQuery.data}
-            columns={[
-              { key: "entityId", header: "Entity ID" },
-              {
-                key: "metadata",
-                header: "Error",
-                render: (value) =>
-                  typeof value === "object" && value !== null && "error" in value
-                    ? String((value as { error?: string }).error ?? "Unknown")
-                    : "Unknown"
-              },
-              {
-                key: "occurredAt",
-                header: "Occurred",
-                render: (value) => new Date(String(value)).toLocaleString()
-              }
-            ]}
-          />
-        ) : (
-          <LoadingState label="Loading failed jobs..." />
-        )}
+        <QueryBoundary
+          query={jobFailuresQuery}
+          loadingLabel="Loading failed jobs..."
+          emptyMessage="No background job failures in the selected range."
+        >
+          {(data) => (
+            <DataTable
+              rows={data}
+              columns={[
+                { key: "entityId", header: "Entity ID" },
+                {
+                  key: "metadata",
+                  header: "Error",
+                  render: (value) =>
+                    typeof value === "object" && value !== null && "error" in value
+                      ? String((value as { error?: string }).error ?? "Unknown")
+                      : "Unknown"
+                },
+                {
+                  key: "occurredAt",
+                  header: "Occurred",
+                  render: (value) => new Date(String(value)).toLocaleString()
+                }
+              ]}
+            />
+          )}
+        </QueryBoundary>
       </ChartCard>
     </div>
   );

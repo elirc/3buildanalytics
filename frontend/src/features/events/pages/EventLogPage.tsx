@@ -14,12 +14,12 @@ export function EventLogPage() {
   const eventType = filters.eventType;
   const query = useEvents(filters.startDate, filters.endDate, eventType || undefined);
 
-  if (query.isLoading) {
+  if (query.isPending) {
     return <LoadingState label="Loading event log..." />;
   }
 
   if (query.isError || !query.data) {
-    return <ErrorState message={query.error?.message ?? "Failed to load events"} />;
+    return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   }
 
   return (

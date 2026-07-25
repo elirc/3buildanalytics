@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getActiveUsers, getConversionFunnel, getEventsOverTime, getKpiSummary } from "../../../api/dashboard.api";
-import { ErrorState } from "../../../components/ErrorState";
-import { LoadingState } from "../../../components/LoadingState";
+import { QueryBoundary } from "../../../components/QueryBoundary";
 import { ChartCard } from "../components/ChartCard";
 import { ConversionFunnelChart } from "../components/ConversionFunnelChart";
 import { DashboardFilterBar } from "../components/DashboardFilterBar";
@@ -30,14 +29,6 @@ export function ProductDashboardPage() {
     queryFn: () => getEventsOverTime({ startDate: filters.startDate, endDate: filters.endDate, interval: filters.interval })
   });
 
-  if (kpis.isLoading) {
-    return <LoadingState label="Loading product analytics..." />;
-  }
-
-  if (kpis.isError || !kpis.data) {
-    return <ErrorState message={kpis.error?.message ?? "Failed to load product dashboard"} />;
-  }
-
   return (
     <div className="space-y-6">
       <DashboardFilterBar
@@ -47,17 +38,34 @@ export function ProductDashboardPage() {
         onRangeChange={(range) => updateFilters(range)}
         onIntervalChange={(interval) => updateFilters({ interval })}
       />
-      <KpiCardGrid data={kpis.data} />
+
+      <QueryBoundary query={kpis} loadingLabel="Loading product analytics..." isEmpty={() => false}>
+        {(data) => <KpiCardGrid data={data} />}
+      </QueryBoundary>
+
       <div className="grid gap-6 xl:grid-cols-2">
         <ChartCard title="Active users trend" description="Distinct actors are bucketed by date on the backend.">
-          {activeUsers.data ? <MetricSeriesChart data={activeUsers.data.map((item) => ({ date: item.date, value: item.activeUsers }))} /> : <LoadingState label="Loading active users..." />}
+          <QueryBoundary query={activeUsers} loadingLabel="Loading active users...">
+            {(data) => (
+              <MetricSeriesChart data={data.map((item) => ({ date: item.date, value: item.activeUsers }))} />
+            )}
+          </QueryBoundary>
         </ChartCard>
         <ChartCard title="Feature funnel" description="Product funnel stages are derived from tracked event types.">
-          {funnel.data ? <ConversionFunnelChart data={funnel.data} /> : <LoadingState label="Loading funnel..." />}
+          <QueryBoundary query={funnel} loadingLabel="Loading funnel...">
+            {(data) => <ConversionFunnelChart data={data} />}
+          </QueryBoundary>
         </ChartCard>
       </div>
+
       <ChartCard title="Event volume" description="Product teams can compare usage motion over shared date ranges.">
-        {eventTrend.data ? <EventsOverTimeChart data={eventTrend.data.data} /> : <LoadingState label="Loading product trend..." />}
+        <QueryBoundary
+          query={eventTrend}
+          loadingLabel="Loading product trend..."
+          isEmpty={(data) => data.data.length === 0}
+        >
+          {(data) => <EventsOverTimeChart data={data.data} />}
+        </QueryBoundary>
       </ChartCard>
     </div>
   );

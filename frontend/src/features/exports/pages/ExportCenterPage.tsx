@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { createExportJob, downloadExportJob, getExportJobs, retryExportJob, type ExportJob } from "../../../api/exports.api";
 import { DataTable } from "../../../components/DataTable";
-import { LoadingState } from "../../../components/LoadingState";
+import { QueryBoundary } from "../../../components/QueryBoundary";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { formatDateTime, getDefaultDateRange } from "../../../lib/formatDate";
@@ -57,9 +57,14 @@ export function ExportCenterPage() {
           </Button>
         </div>
       </Card>
-      {exportJobsQuery.data ? (
+      <QueryBoundary
+        query={exportJobsQuery}
+        loadingLabel="Loading export history..."
+        emptyMessage="No exports yet. Create one above."
+      >
+        {(jobs) => (
         <DataTable
-          rows={exportJobsQuery.data}
+          rows={jobs}
           columns={[
             { key: "exportType", header: "Type" },
             { key: "status", header: "Status" },
@@ -105,9 +110,8 @@ export function ExportCenterPage() {
             }
           ]}
         />
-      ) : (
-        <LoadingState label="Loading export history..." />
-      )}
+        )}
+      </QueryBoundary>
     </div>
   );
 }
