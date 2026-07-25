@@ -1,6 +1,0 @@
-id,eventType,actorEmail,entityType,entityId,occurredAt
-"48e1f5b1-c9b7-4102-aa61-15725b0e62de","API_ERROR","actor-42@example.com","User","entity-42","2026-01-15T12:00:00.000Z"
-"84d52345-d2ef-45f6-89eb-d0e8fa0cf65b","API_ERROR","actor-41@example.com","User","entity-41","2026-01-15T12:00:00.000Z"
-"4dc60527-af9f-4a88-bbac-fe1cccfa59a0","API_ERROR","actor-40@example.com","User","entity-40","2026-01-15T12:00:00.000Z"
-"1da14179-c975-4d09-b109-5dadea193e57","API_ERROR","actor-39@example.com","User","entity-39","2026-01-15T12:00:00.000Z"
-"1c266372-1773-4087-9883-eaf250c687f9","API_ERROR","actor-38@example.com","User","entity-38","2026-01-15T12:00:00.000Z"
