@@ -137,6 +137,9 @@ model ExportJob {
   fileUrl       String?
   rowCount      Int?
   errorMessage  String?
+  /// Times this job has been retried. Capped in the service so a permanently
+  /// broken export cannot be retried forever.
+  retryCount    Int          @default(0)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   completedAt   DateTime?

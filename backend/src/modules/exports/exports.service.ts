@@ -17,6 +17,7 @@ import { exportsRepository } from "./exports.repository.js";
 import { csvService } from "./csv.service.js";
 
 const MAX_SYNC_EXPORT_ROWS = 10_000;
+const MAX_RETRIES = 3;
 
 export const exportsService = {
   async create(input: {
@@ -49,31 +50,13 @@ export const exportsService = {
       }
     });
 
-    if (estimatedRowCount <= MAX_SYNC_EXPORT_ROWS) {
-      return this.processJob(job.id, {
-        requestedById: input.requestedById,
-        requestedByRole: input.requestedByRole
-      });
-    }
-
-    try {
-      await getExportQueue().add("PROCESS_EXPORT", {
-        exportJobId: job.id,
-        requestedById: input.requestedById,
-        requestedByRole: input.requestedByRole
-      });
-    } catch (error) {
-      logWarn("export.queue.unavailable.falling_back", {
-        exportJobId: job.id,
-        error: error instanceof Error ? error.message : "unknown"
-      });
-      await this.processJob(job.id, {
-        requestedById: input.requestedById,
-        requestedByRole: input.requestedByRole
-      });
-    }
-
-    return job;
+    return dispatchJob(job.id, {
+      exportType: input.exportType,
+      filters: input.filters,
+      requestedById: input.requestedById,
+      requestedByRole: input.requestedByRole,
+      knownRowCount: estimatedRowCount
+    });
   },
 
   /** Row count a set of filters would produce, without creating a job. */
@@ -109,6 +92,16 @@ export const exportsService = {
     };
   },
 
+  /**
+   * Retries a failed export, reusing the same row.
+   *
+   * The previous implementation reset this job to PENDING and then called
+   * create(), which inserted a *second* job. The original stayed PENDING
+   * forever because nothing would ever pick it up, so every retry leaked one
+   * permanently-pending row — and since queue depth is counted from PENDING
+   * rows, the engineering dashboard's backlog climbed on every retry and never
+   * came down.
+   */
   async retry(userId: string, id: string, userRole: Express.User["role"]) {
     const job = await this.getById(userId, id);
 
@@ -116,19 +109,31 @@ export const exportsService = {
       throw new AppError(ERROR_CODES.BAD_REQUEST, "Only failed exports can be retried", 400);
     }
 
+    if (job.retryCount >= MAX_RETRIES) {
+      throw new AppError(
+        ERROR_CODES.BAD_REQUEST,
+        `This export has already been retried ${MAX_RETRIES} times. Create a new one instead.`,
+        400
+      );
+    }
+
     await exportsRepository.update(job.id, {
       status: ExportStatus.PENDING,
       errorMessage: null,
       completedAt: null,
       fileName: null,
-      fileUrl: null
+      fileUrl: null,
+      retryCount: job.retryCount + 1
     });
 
-    return this.create({
-      requestedById: userId,
-      requestedByRole: userRole,
+    // Same id, not a new job. Dispatch makes the same sync-or-queue decision
+    // create() does, so a small retry completes immediately instead of waiting
+    // on a queue that may not be reachable.
+    return dispatchJob(job.id, {
       exportType: job.exportType,
-      filters: (job.filtersJson as Record<string, unknown> | null) ?? undefined
+      filters: (job.filtersJson as Record<string, unknown> | null) ?? undefined,
+      requestedById: userId,
+      requestedByRole: userRole
     });
   },
 
@@ -142,10 +147,30 @@ export const exportsService = {
       throw new AppError(ERROR_CODES.NOT_FOUND, "Export job not found", 404);
     }
 
-    await exportsRepository.update(job.id, {
-      status: ExportStatus.PROCESSING,
-      errorMessage: null
+    /**
+     * Claim the job with a conditional update.
+     *
+     * BullMQ retries on failure and can redeliver, and the sync path can race
+     * a worker that picked the same job up. Without a claim the same export is
+     * processed twice: two CSVs written, two CSV_EXPORTED tracked events, two
+     * EXPORT_COMPLETED audit rows for one user action.
+     *
+     * Only PENDING or FAILED can be claimed, and the update is atomic — if it
+     * touches zero rows someone else already has it, so we return their result
+     * rather than duplicating the work.
+     */
+    const claimed = await prisma.exportJob.updateMany({
+      where: {
+        id: job.id,
+        status: { in: [ExportStatus.PENDING, ExportStatus.FAILED] }
+      },
+      data: { status: ExportStatus.PROCESSING, errorMessage: null }
     });
+
+    if (claimed.count === 0) {
+      logWarn("export.job.already_claimed", { exportJobId: job.id, status: job.status });
+      return exportsRepository.findById(job.id);
+    }
 
     try {
       const requestContext = await resolveRequestContext(job.requestedById, context?.requestedByRole);
@@ -222,6 +247,57 @@ export const exportsService = {
     }
   }
 };
+
+/**
+ * Decides how an export runs and starts it.
+ *
+ * Small exports run inline so the user gets an immediate download; large ones
+ * go on the queue. If the queue cannot be reached we process inline anyway and
+ * log it — degraded, not broken, which is the same posture server.ts takes when
+ * Redis is missing at boot.
+ *
+ * Shared by create() and retry() so the two cannot drift. retry() previously
+ * had no such logic at all: it delegated to create(), which is what produced
+ * the duplicate-job bug.
+ */
+async function dispatchJob(
+  jobId: string,
+  context: {
+    exportType: ExportType;
+    filters?: Record<string, unknown>;
+    requestedById: string;
+    requestedByRole: Express.User["role"];
+    knownRowCount?: number;
+  }
+) {
+  const rowCount =
+    context.knownRowCount ?? (await estimateExportRows(context.exportType, context.filters));
+
+  if (rowCount <= MAX_SYNC_EXPORT_ROWS) {
+    return exportsService.processJob(jobId, {
+      requestedById: context.requestedById,
+      requestedByRole: context.requestedByRole
+    });
+  }
+
+  try {
+    await getExportQueue().add("PROCESS_EXPORT", {
+      exportJobId: jobId,
+      requestedById: context.requestedById,
+      requestedByRole: context.requestedByRole
+    });
+    return exportsRepository.findById(jobId);
+  } catch (error) {
+    logWarn("export.queue.unavailable.falling_back", {
+      exportJobId: jobId,
+      error: error instanceof Error ? error.message : "unknown"
+    });
+    return exportsService.processJob(jobId, {
+      requestedById: context.requestedById,
+      requestedByRole: context.requestedByRole
+    });
+  }
+}
 
 /**
  * Counts what an export would produce.
