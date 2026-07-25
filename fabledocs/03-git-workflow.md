@@ -137,7 +137,8 @@ Story-by-story progress against [`02-user-stories.md`](02-user-stories.md).
 | Story | Status | PR |
 | --- | --- | --- |
 | US-20 Database-backed tests and CI | **Merged** | [#1](https://github.com/elirc/3buildanalytics/pull/1) |
-| US-01 … US-19 | Not started | — |
+| US-01 Navigation matches real permissions | **Merged** | [#3](https://github.com/elirc/3buildanalytics/pull/3) |
+| US-02 … US-19 | Not started | — |
 
 US-20 was pulled ahead of US-01 for the reason given in its PR: every other
 story asks for integration tests, and until CI ran a database none of them
